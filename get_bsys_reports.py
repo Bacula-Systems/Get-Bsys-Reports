@@ -61,23 +61,7 @@ remote_tmp_dir ='/opt/bacula/working'
 
 # Define some functions
 # ---------------------
-
-# Probably won't need/use this ever
-# ---------------------------------
-# def get_dir_name():
-#     'Get the name of the Director. Possibly will be used as part of the final tar filename'
-#     status = subprocess.run('echo -e "quit\n" | ' + bc_bin + ' -c ' + bc_cfg , shell=True, capture_output=True, text=True)
-#     return re.sub('^.* OK: [0-9]{5} (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
-
-# Not implemented. Need to think if it is worth it. Consider Windows clients, etc...
-# ----------------------------------------------------------------------------------
-# def get_clients():
-#     'Get the Clients defined in the Director.'
-#     status = subprocess.run('echo -e ".storage\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
-#     return re.sub('^.*storage(.*)\n.*quit.*', '\\1', status.stdout, flags=re.DOTALL).split()
-
 def get_storages():
-    bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
     'Get the Storage/Autochangers defined in the Director.'
     status = subprocess.run('echo -e ".storage\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
     if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
@@ -86,9 +70,7 @@ def get_storages():
             + status.stdout + '====================================================')
         return False
     else:
-        # print('OK')
-        # print(re.sub('^.*storage(.*)\n.*(You have messages.)?\n.*quit.*', '\\1', status.stdout, flags=re.DOTALL).split())
-        return re.sub('^.*storage(.*)\n.*(You have messages.)?\n.*quit.*', '\\1', status.stdout, flags=re.DOTALL).split()
+        return re.sub('^.*storage\n(.*)(You have messages.)?\n.*quit.*', '\\1', status.stdout, flags=re.DOTALL).split()
 
 def is_ip_address(address):
     'Given a string, determine if it is a valid IP address'
@@ -112,6 +94,7 @@ def resolve(address):
 import os
 import re
 import sys
+import docopt
 import socket
 import tempfile
 import subprocess
@@ -161,9 +144,10 @@ for st in get_storages():
     # Now add name and IP to the storage_dict dictionary
     # but only if the IP address does not exist in values()
     # -----------------------------------------------------
+    # for testing results output:
     # if ip != '10.1.1.4' and ip != '127.0.0.1' and ip not in storage_dict.values():
     if ip not in storage_dict.values():
-        print('      Adding Storage "' + st + '" (' + ip + ') to hosts to gather bsys report from.')
+        print('      Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
         storage_dict[st] = ip
     else:
         print('      IP address for Storage "' + st + '" (' + ip + ') already in list. Skipping...')
@@ -176,31 +160,31 @@ print('\n- Will attempt to retrieve report' + ('' if len(storage_dict) == 1 else
 # Loop through the unique hosts (IP addresses) identifed
 # ------------------------------------------------------
 for host in storage_dict.values():
-    print('- Working on host: ' + host)
+    print('  - Working on host: ' + host)
     c = Connection(host=host, user=user)
 
     # Upload the local bsys report script to the remote host
     # ------------------------------------------------------
-    print('  - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
+    print('    - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
     try:
         result = c.put(local_script_dir + '/' + local_script_name, remote=remote_tmp_dir)
     except:
-        print('    - Problem uploading ' + local_script_dir + '/' + local_script_name + ' to ' + remote_tmp_dir)
-        print('      - Skipping this host "' + st + '"!\n')
+        print('      - Problem uploading ' + local_script_dir + '/' + local_script_name + ' to ' + remote_tmp_dir)
+        print('        - Skipping this host "' + st + '"!\n')
         continue
-    print('    - Done')
+    print('      - Done')
 
     # Run the uploaded bsys report generator script and
     # capture the output to get the name of the report file
     # -----------------------------------------------------
-    print('  - Running ' + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
+    print('    - Running ' + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
     try:
         result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
     except:
-        print('    - Problem encountered while trying to run remote script ' + host + ':' + remote_script_name)
-        print('      - Skipping this host "' + st + '"!\n')
+        print('      - Problem encountered while trying to run remote script ' + host + ':' + remote_script_name)
+        print('        - Skipping this host "' + st + '"!\n')
         continue
-    print('    - Done')
+    print('      - Done')
 
     # Strip the comma off of the name that
     # was captured when the script was run
@@ -210,21 +194,22 @@ for host in storage_dict.values():
     # Create a filename for the downloaded bsys report
     # that is pre-pended with the host's IP address
     # ------------------------------------------------
-    local_dl_file = local_tmp_dir + '/' + host + '-' + os.path.basename(remote_dl_file)
+    local_dl_file = local_tmp_dir + '/' + os.path.basename(remote_dl_file)
 
     # Now download the report
     # -----------------------
-    print('  - Retrieving report ' + host + ':' +remote_dl_file + '\n    to local directory: ' + local_tmp_dir)
+    print('    - Retrieving report ' + host + ':' +remote_dl_file + '\n      to local directory: ' + local_tmp_dir)
     try:
         result = c.get(remote_dl_file, local=local_dl_file)
     except:
-        print('Problem encountered while trying to download remote bsys report ' + host + ':' + remote_dl_file + '\n    as: ' + local_dl_file)
-        print('      - Skipping this host "' + st + '"!\n')
+        print('      - Problem encountered while trying to download remote bsys report ' + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file)
+        print('        - Skipping this host "' + st + '"!\n')
         continue
-    print('    - Done\n')
+    print('      - Done\n')
 
 # Create a tarball of all the downloaded bsys reports.
-# Skip tarring if there is only one file.
+# Skip tarring if there is only one file, and report
+# the results.
 # ----------------------------------------------------
 if len(storage_dict) <= 1:
     if len(storage_dict) == 0:
@@ -245,8 +230,8 @@ else:
         if len(storage_dict) >= 1:
             print('- ' + ('All ' if len(storage_dict) > 1 else 'The ') + 'bsys report' \
                 + ('s' if len(storage_dict) > 1 else '') + (' is' if len(storage_dict) == 1 else ' are') \
-                + ' available in: ' + local_tmp_dir)
-        print('- Archive (tgz) file of all reports available as: ' + local_tmp_dir + '/' + tar_filename)
+                + ' available in directory: ' + local_tmp_dir)
+        print('- Archive (tgz) of all reports available as: ' + local_tmp_dir + '/' + tar_filename)
 print('- Script complete.\n')
 
 
