@@ -96,7 +96,7 @@ INSTRUCTIONS
 # -----------------------------------------------------
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
-user = 'root'
+ssh_user = 'root'
 
 # Should sudo be used to run commands on remote servers?
 # ------------------------------------------------------
@@ -118,7 +118,8 @@ local_script_dir = '/opt/comm-bacula/include/scripts'
 
 # Where to upload the script on the remote servers
 # ------------------------------------------------
-remote_tmp_dir ='/tmp'
+local_tmp_root_dir = '/tmp'  # This may be set to a permanent location to keep history of reports
+remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user
 
 # --------------------------------------------------
 # Nothing should need to be modified below this line
@@ -220,7 +221,7 @@ args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + r
 print(colored('\n- Script starting...', 'green', attrs=['bold']))
 now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
-local_tmp_dir = tempfile.mkdtemp(dir='/tmp', prefix='all_bsys_reports-')
+local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
 
 # Get the ticket mask or company name to name the .tgz file
@@ -330,7 +331,7 @@ else:
     reports = 0
     for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
-        c = Connection(host = host, user = user)
+        c = Connection(host = host, user = ssh_user)
         # c.close()
         # c = Connection(host=host, user=user, connect_kwargs={'allow_agent': True})
 
