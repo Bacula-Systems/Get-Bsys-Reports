@@ -177,7 +177,6 @@ def resolve(address):
 # ------------
 # Begin script
 # ------------
-
 # Import modules and methods
 # --------------------------
 import os
@@ -215,9 +214,6 @@ Options:
 
 """
 
-# ----------------
-# Start the script
-# ----------------
 # Assign docopt doc string variable
 # ---------------------------------
 args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + reldate + '\n')
@@ -343,7 +339,6 @@ else:
         # ---------------------------------------------------------------------
         print('      - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
         try:
-            print('local=' + local_script_dir + '/' + local_script_name + ', remote=' + remote_script_name)
             result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
         except:
             errors += 1
