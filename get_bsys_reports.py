@@ -1,52 +1,114 @@
 #!/usr/bin/python3
 
-# 20220406 - waa - Initial notes and ideas
-# ----------------------------------------
-#
-# - Command line options... --all (DIR, and all SDs), --dir (Just the DIR), --sds (All SDs), SD,SD,SD (specific SDs)
-#   NOTE: ** This ended up being just --ALL or a space separated list of Storage/Autochanger resource names **
-# - Get Dir name from `s dir`   - No need, decided to ask for ticket mask instead
-#   - the tgz file will now be named 'ticketmask_yyyymmddhhmmss.tgz' or 'CompanyName_yyyymmddhhmmss.tgz'
-# - Will need to ask bconsole `.storage` to get all storages
-#   defined, then filter for same IPs/FQDNs because multiple
-#   Director Storage resources can point to the same SD server
-# - Loop through systems on command line and/or determined from
-#   config and then do the following:
-#   - scp the defined bsysreport.pl script (configurable) to each
-#     system
-#   - Using ssh, then remotely run the script, capturing the name
-#     of the file it will write to from its output
-#   - When the script finishes, scp the report back to a local
-#     tmp xxxx directory, renaming it to include the Director,
-#     or Storage resource's name - or the Address = name, or other.
-#     I need to think more on this.
-#   - When all hosts have been contacted and the script outputs
-#     have been downloaded, tar/gzip them using a local system name
-#     and timestamp. Tgz file name might use some variable too.
-#
-# TODO: Maybe we add an option to download the latest bsys report generator script
-# https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
-#
-# --------------------------------------------------------------------------------
+# 20220421 - waa - Initial release
+# --------------------------------
+"""
+------------
+INSTRUCTIONS
+------------
 
-# Need to install several modules via pip:
-#
-# sudo pip3 install fabric
-# sudo pip3 install docopt
-# sudo pip3 install termcolor
+- Please read all of these instructions before attempting to run this script.
+  There are a lot of moving parts, and there are a lot of things (external to
+  this script) that need to be working before using this script.
 
+- The idea and workflow of this script is as follows:
+
+  Given a command line option of '--ALL', this script will attempt to collect
+  bsys reports from the Director server and all the Storage/Autochanger
+  resources defined in the Director's configuration.
+
+  You will first be asked to enter the ticket mask that htese bsys reports are
+  for (ie: TIA-91987-337), or your company name so that we know what ticket
+  these reports are for.
+
+  For the Director and each Storage/Autochanger resource found in the
+  Director's configuration, this script will then get the "Address=" and
+  determine if it is an IP address or not. If it is a host or FQDN, the script
+  will attempt to resolve it to an IP address. If the DNS lookup fails to
+  resolve the host/FQDN to an IP address it will flag an error and move on to
+  the next host, skipping this one.
+
+  Given names of Storage/Autochanger(s) on the command line, separated by
+  spaces, the script will get the list of Storage/Autochanger resources from
+  the Director, and then validate that each one on the command line is in the
+  Director's configuration. If any are not, then the script exits.
+
+  Once there is a valid list of Storage/Autochangers, the same process of
+  getting an IP address for each one specified is performed.
+
+  This list is created in such a way that there are no duplicate IP addresses
+  so that only one report is gathered from each system.
+
+  Once we have the list of unique IP addresses, the script will iterate
+  through the list, upload the bsys_report.pl script file to the host, run the
+  script (and grab the unique name of the report tgz file that will be
+  created), and when the script is finished, download the resulting report
+  file from the host into a local temporary directory.
+
+  When all reports are downloaded, if there are more than one, they will be
+  tarred into one file to be sent to Support.
+
+  -----------------------------------------------------------------------------
+
+- Now for the interesting REQUIRED things to be in place before this script
+  can be successfully run:
+
+  - This script REQUIRES Python >= 3.9 to run.
+  - There are several Python modules that you will need to have installed on
+    your system for this script to run. (see below)
+  - You will need to download a current bsys report generator script from here:
+    https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
+    untar/gunzip the perl script `bsys_report.pl` file, and set it executable.
+  - Edit the `local_script_name` and `local_script_dir` variables accordingly.
+  - You MUST have created a public/private ssh key pair on the host that will
+    be running this script.
+  - The public key must already be on each server that the script might need
+    to retreive a bsys report from.
+  - The public key should be added to the ~/.ssh/authorized_keys file on the
+    server of the user that the script will be connecting as (default `root`).
+  - You must be running `ssh-agent` on the host that will run this script, and
+    your private key MUST already have been added to it.
+  - If you will be using a user other than `root` to connect to the remote
+    hosts, there is the ability to use sudo to actually run the script. To do
+    this, the `use_sudo` and `sudo_user` variables must be set properly.
+  - Additionally, to use sudo, the user on each remote host must be allowed to
+    run any command without being prompted for a password.
+  - The script does not need to be run on the Director! If it is not, then
+    you must have bconsole installed on the host that will run the script, and a
+    properly configured bconsole.conf configuration file that allows bconsole
+    to communicate with the Director.
+  - This script only uses the `.storage` and `show storage=xxxx` bconsole
+    commands, so you may consider using a non-privileged Console configured in
+    the Director to limit access.
+
+  - REQUIRE MODULES:
+
+    Before running this script, you will need to install several modules via pip:
+
+    # sudo pip3 install docopt
+    # sudo pip3 install fabric
+    # sudo pip3 install termcolor
+
+"""
+
+#
 # SET SOME VARIABLES SPECIFIC TO THE LOCAL ENVIRONMENT:
 # -----------------------------------------------------
-
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
 user = 'root'
+
+# Should sudo be used to run commands on remote servers?
+# ------------------------------------------------------
+use_sudo = 'no'
+sudo_user = ''
 
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
 # bc_bin = '/opt/bacula/bin/bconsole'
 # bc_cfg = '/opt/bacula/etc/bconsole.conf'
 bc_bin = '/opt/comm-bacula/sbin/bconsole'
+# bc_cfg = '/opt/comm-bacula/etc/centos7_bconsole.conf'
 bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
 
 # Define the location of the local bsys_report.pl
@@ -56,14 +118,25 @@ local_script_dir = '/opt/comm-bacula/include/scripts'
 
 # Where to upload the script on the remote servers
 # ------------------------------------------------
-remote_tmp_dir ='/opt/bacula/working'
+remote_tmp_dir ='/tmp'
 
 # --------------------------------------------------
 # Nothing should need to be modified below this line
 # --------------------------------------------------
 
+# TODO: Maybe we add an option to download the latest bsys report generator
+# script https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
+# -------------------------------------------------------------------------
+
 # Define some functions
 # ---------------------
+def get_dir_info():
+    'Get Director name and address'
+    status = subprocess.run('echo -e "quit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    name  = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
+    address = re.sub('^Connecting to Director (.+?):.*', '\\1', status.stdout, flags=re.DOTALL)
+    return name, address
+
 def get_storages():
     'Get the Storage/Autochangers defined in the Director.'
     status = subprocess.run('echo -e ".storage\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
@@ -82,8 +155,7 @@ def get_storages():
 
 def get_storage_address(st):
     'Given a Director Storage/Autochanger name, return the IP address'
-    status = subprocess.run('echo -e "show storage=' + st + '\nquit\n" | ' \
-           + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    status = subprocess.run('echo -e "show storage=' + st + '\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
     return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', status.stdout, flags=re.DOTALL)
 
 def is_ip_address(address):
@@ -116,8 +188,8 @@ import tempfile
 import subprocess
 from docopt import docopt
 from datetime import datetime
-from fabric import Connection
 from termcolor import colored
+from fabric import Connection
 from ipaddress import ip_address, IPv4Address
 
 # Set some variables
@@ -130,13 +202,13 @@ reldate = 'April 18, 2022'
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--ALL | <SD>...)
+    get_bsys_reports.py (--ALL | SD...)
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
 Options:
     --ALL          Get reports from the (local) DIR and all Storage Resources defined in Director configuration
-    <SD>...        Get reports from specific Storage resources (ie: get_bsys_reports.py SD_01 SD_02 SD_03)
+    SD...          Get reports from specific Storage resources (ie: get_bsys_reports.py SD_01 SD_02 SD_03)
 
     -h, --help     Print this help message
     -v, --version  Print the script name and version
@@ -151,8 +223,9 @@ Options:
 args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + reldate + '\n')
 print(colored('\n- Script starting...', 'green', attrs=['bold']))
 now = datetime.now().strftime('%Y%m%d%H%M%S')
-remote_script_name = remote_tmp_dir + '/' + local_script_name
+remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir='/tmp', prefix='all_bsys_reports-')
+errors = 0
 
 # Get the ticket mask or company name to name the .tgz file
 # ---------------------------------------------------------
@@ -178,12 +251,11 @@ except:
 
 if args['--ALL']:
     print('  - Option \'--All\' provided on command line. Will attempt to get reports from local DIR and all SDs')
-    all_storage_lst.append('DIR')
     storage_lst = all_storage_lst
 else:
-    print('  - The following Storage/Autochanger resources were provided on the command line: ' + colored(", ".join(args['<SD>']), 'yellow'))
+    print('  - The following Storage/Autochanger resources were provided on the command line: ' + colored(", ".join(args['SD']), 'yellow'))
     print('    - Checking validity of given Storage/Atuochanger resources.')
-    for st in args['<SD>']:
+    for st in args['SD']:
         if st in all_storage_lst:
             print(colored('      - Storage ' + st + ' is valid.', 'green'))
             storage_lst.append(st)
@@ -194,13 +266,28 @@ else:
 
 # Create a dictionary of Storage resources defined in the Director
 # ----------------------------------------------------------------
-storage_dict = {}
-print(colored('\n    - Determining IP address for each Storage resource and creating unique host list.', 'white', attrs=['bold']))
-for st in storage_lst:
-    if st == 'DIR':
-        address = '127.0.0.1'
+host_dict = {}
+print(colored('\n    - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
++ 'Storage resource' + ('s' if len(storage_lst) > 1 else '') + ' and creating unique host list.', 'white', attrs=['bold']))
+
+if args['--ALL']:
+    dir_name, dir_address = get_dir_info()
+    print(colored('\n      - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
+    if is_ip_address(dir_address):
+        print('        - ' + dir_address + ' is an IP address')
     else:
-        address = get_storage_address(st)
+        print('        - ' + dir_address + ' is not an IP address. Attempting to resolve...')
+        ip = resolve(dir_address)
+        if ip == False:
+            errors += 1
+            print(colored('        - Oops, cannot resolve FQDN/host ', 'red') + colored('"' + address + '"', 'red'))
+            print(colored('          - Will not attempt to retreive report from Director', 'red') + colored('"' + dir_name + '"', 'red'))
+        else:
+            print('          - Adding Director\'s IP address ' + ip + ' to list of hosts to retreive report from.')
+            host_dict['Director'] = ip
+
+for st in storage_lst:
+    address = get_storage_address(st)
     print(colored('      - Storage: ', 'green') + colored(st, 'yellow') + ', ' + colored('Address: ', 'green') + colored(address, 'yellow'))
 
     # Now determine if address is FQDN/host or IP address.
@@ -214,44 +301,52 @@ for st in storage_lst:
         print('        - ' + address + ' is not an IP address. Attempting to resolve...')
         ip = resolve(address)
         if ip == False:
-            print(colored('          - Oops, cannot resolve FQDN/host ', 'red') + address)
+            errors += 1
+            print(colored('          - Oops, cannot resolve FQDN/host ', 'red') + colored('"' + address + '"', 'red'))
+            print(colored('            - Removing ', 'red') + colored('"' + st + '"', 'red') + colored(' from host list', 'red'))
+            storage_lst.remove(st)
             continue
         else:
             print('          - FQDN/host ' + address + ' = ' + ip)
 
-    # Now add name and IP to the storage_dict dictionary
+    # Now add name and IP to the host_dict dictionary
     # but only if the IP address does not exist in values
     # ---------------------------------------------------
-    if ip not in storage_dict.values():
+    if ip not in host_dict.values():
         print('        - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
-        storage_dict[st] = ip
+        host_dict[st] = ip
     else:
         print('        - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each qualified host
 # --------------------------------------------
-if len(storage_dict) == 0:
+if len(host_dict) == 0:
     print(colored('\n  - There are no valid Storages/Autochangers to gather reports from!', 'red'))
 else:
-    print(colored('\n  - Will attempt to retrieve report' + ('' if len(storage_dict) == 1 else 's') \
-        + ' from server' + ('' if len(storage_dict) == 1 else 's') \
-        + ' with IP address' + ('' if len(storage_dict) == 1 else 'es') \
-        + ': ', 'white', attrs=['bold'])+ colored(", ".join(storage_dict.values()), 'yellow'))
+    print(colored('\n  - Will attempt to retrieve report' + ('' if len(host_dict) == 1 else 's') \
+        + ' from server' + ('' if len(host_dict) == 1 else 's') \
+        + ' with IP address' + ('' if len(host_dict) == 1 else 'es') \
+        + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
 
-    # Loop through the unique hosts (IP addresses) identifed and then
+    # Iterate through the unique hosts (IP addresses) identifed and then
     # upload the bsys_report.pl script, run it, and download the report
-    # -----------------------------------------------------------------
+    # ------------------------------------------------------------------
     reports = 0
-    for host in storage_dict.values():
+    for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
-        c = Connection(host=host, user=user)
+        c = Connection(host = host, user = user)
+        # c.close()
+        # c = Connection(host=host, user=user, connect_kwargs={'allow_agent': True})
 
-        # Upload the local bsys report script to the remote host
-        # ------------------------------------------------------
+        # Upload the local bsys report generator script to the remote host with
+        # a timestamped filename to prevent overwrites or permission issues
+        # ---------------------------------------------------------------------
         print('      - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
         try:
-            result = c.put(local_script_dir + '/' + local_script_name, remote=remote_tmp_dir)
+            print('local=' + local_script_dir + '/' + local_script_name + ', remote=' + remote_script_name)
+            result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
         except:
+            errors += 1
             print(colored('        - Problem uploading ' + local_script_dir + '/' + local_script_name + ' to ' + remote_tmp_dir, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
@@ -260,10 +355,19 @@ else:
         # Run the uploaded bsys report generator script and
         # capture the output to get the name of the report file
         # -----------------------------------------------------
-        print('      - Running ' + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
+        print('      - Running ' + ('(via sudo) ' if use_sudo == 'yes' else '') \
+        + ('as user ' + sudo_user + ' ' if sudo_user != '' else '') \
+        + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
         try:
-            result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
+            if use_sudo == 'yes':
+                if sudo_user != '':
+                    result = c.sudo(remote_script_name + ' -o ' + remote_tmp_dir, user=sudo_user, hide=True)
+                else:
+                    result = c.sudo(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
+            else:
+                result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
         except:
+            errors += 1
             print(colored('        - Problem encountered while trying to run remote script ' + host + ':' + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
@@ -286,6 +390,7 @@ else:
             result = c.get(remote_dl_file, local=local_dl_file)
             reports += 1
         except:
+            errors += 1
             print(colored('        - Problem encountered while trying to download remote bsys report ' + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
@@ -295,10 +400,10 @@ else:
 # Skip tarring if there is only one file, and report
 # the results.
 # ----------------------------------------------------
-if len(storage_dict) <= 1:
-    if len(storage_dict) == 0 or reports == 0:
+if len(host_dict) <= 1:
+    if len(host_dict) == 0 or reports == 0:
         print(colored('  - No bsys reports retreived.', 'red'))
-    elif len(storage_dict) == 1:
+    elif len(host_dict) == 1:
         print('  - Only one bsys report retreived. Not creating tarball of one file.')
         print('    - The one bsys report is located in ' + local_dl_file)
 else:
@@ -307,16 +412,17 @@ else:
     try:
         result = subprocess.run('cd ' + local_tmp_dir + '; tar -cvzf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
     except:
+        errors += 1
         tar_err = True
         print(colored('    - Problem encountered while trying to tar bsys reports.', 'red'))
         print(colored('    - Please check the local directory ', 'red') + local_tmp_dir)
     if tar_err == False:
         print(colored('    - Done\n', 'green'))
-        if len(storage_dict) >= 1:
-            print('  - ' + ('All ' if len(storage_dict) > 1 else 'The ') + 'bsys report' \
-                + ('s' if len(storage_dict) > 1 else '') + (' is' if len(storage_dict) == 1 else ' are') \
+        if len(host_dict) >= 1:
+            print('  - ' + ('All ' if len(host_dict) > 1 else 'The ') + 'bsys report' \
+                + ('s' if len(host_dict) > 1 else '') + (' is' if len(host_dict) == 1 else ' are') \
                 + ' available in directory: ' + local_tmp_dir)
         print('  - Archive (tgz) of all reports available as: ' + local_tmp_dir + '/' + tar_filename)
+if errors > 0:
+    print(colored('  - (' + str(errors) + ') Errors were detected during script run. Please check output above!', 'red', attrs=['bold']))
 print(colored('- Script complete.\n', 'green', attrs=['bold']))
-
-
