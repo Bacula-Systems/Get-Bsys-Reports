@@ -118,7 +118,7 @@ local_script_dir = '/opt/comm-bacula/include/scripts'
 
 # Where to upload the script on the remote servers
 # ------------------------------------------------
-local_tmp_root_dir = '/tmp'  # This may be set to a permanent location to keep history of reports
+local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to keep history of reports
 remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user
 
 # --------------------------------------------------
@@ -196,7 +196,7 @@ from ipaddress import ip_address, IPv4Address
 # ------------------
 progname='Get Bsys Reports'
 version = '1.00'
-reldate = 'April 18, 2022'
+reldate = 'April 22, 2022'
 
 # Define the docopt string
 # ------------------------
