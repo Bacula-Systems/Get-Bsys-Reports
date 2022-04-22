@@ -185,6 +185,9 @@ def get_ip_address(address, type = None):
     global errors
     if is_ip_address(address):
         print('        - ' + address + ' is an IP address')
+        if type == 'dir':
+            print('          - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
+            host_dict['Director'] = address 
         return address
     else:
         print('        - ' + address + ' is not an IP address. Attempting to resolve...')
@@ -203,7 +206,7 @@ def get_ip_address(address, type = None):
             print('          - FQDN/host ' + address + ' = ' + ip)
             if type == 'dir':
                 print('          - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
-            host_dict['Director'] = ip
+                host_dict['Director'] = ip
         return ip
 
 # ------------
