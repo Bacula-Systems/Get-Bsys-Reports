@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 
-# 20220421 - waa - Initial release
+# 20220422 - waa - Initial release
 # --------------------------------
 """
 ------------
 INSTRUCTIONS
 ------------
 
-- Please read all of these instructions before attempting to run this script.
+- Please read ALL of these instructions before attempting to run this script.
   There are a lot of moving parts, and there are a lot of things (external to
   this script) that need to be working before using this script.
 
@@ -29,20 +29,21 @@ INSTRUCTIONS
   the next host, skipping this one.
 
   Given names of Storage/Autochanger(s) on the command line, separated by
-  spaces, the script will get the list of Storage/Autochanger resources from
-  the Director, and then validate that each one on the command line is in the
-  Director's configuration. If any are not, then the script exits.
+  spaces, the script will get the list of Storage/Autochanger resources from the
+  Director, and then validate that each one that was provided on the command
+  line is in the Director's configuration. If any are not, the script will
+  print an error messages and exit.
 
   Once there is a valid list of Storage/Autochangers, the same process of
-  getting an IP address for each one specified is performed.
+  getting an IP address for each one provided is performed.
 
   This list is created in such a way that there are no duplicate IP addresses
   so that only one report is gathered from each system.
 
   Once we have the list of unique IP addresses, the script will iterate
   through the list, upload the bsys_report.pl script file to the host, run the
-  script (and grab the unique name of the report tgz file that will be
-  created), and when the script is finished, download the resulting report
+  script, grab the unique name of the report tgz file that will be
+  created, and when the script is finished, download the resulting report
   file from the host into a local temporary directory.
 
   When all reports are downloaded, if there are more than one, they will be
@@ -58,25 +59,26 @@ INSTRUCTIONS
     your system for this script to run. (see below)
   - You will need to download a current bsys report generator script from here:
     https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
-    untar/gunzip the perl script `bsys_report.pl` file, and set it executable.
-  - Edit the `local_script_name` and `local_script_dir` variables accordingly.
-  - You MUST have created a public/private ssh key pair on the host that will
-    be running this script.
+    untar/gunzip the perl `bsys_report.pl` script file, and set it executable.
+  - Edit the `local_script_name` and `local_script_dir` variables in this script
+    accordingly.
+  - You MUST have already created a public/private ssh key pair on the host that
+    will be running this script.
   - The public key must already be on each server that the script might need
     to retrieve a bsys report from.
   - The public key should be added to the ~/.ssh/authorized_keys file on the
     server of the user that the script will be connecting as (default `root`).
   - You must be running `ssh-agent` on the host that will run this script, and
-    your private key MUST already have been added to it.
+    your private key MUST have already been added to it.
   - If you will be using a user other than `root` to connect to the remote
     hosts, there is the ability to use sudo to actually run the script. To do
     this, the `use_sudo` and `sudo_user` variables must be set properly.
   - Additionally, to use sudo, the user on each remote host must be allowed to
     run any command without being prompted for a password.
-  - The script does not need to be run on the Director! If it is not, then
-    you must have bconsole installed on the host that will run the script, and a
-    properly configured bconsole.conf configuration file that allows bconsole
-    to communicate with the Director.
+  - The script does not need to be run on the Director! If it is run on a 
+    different host than the Director, then you must have bconsole installed on
+    the host that will run the script, and a properly configured bconsole.conf
+    configuration file that allows bconsole to communicate with the Director.
   - This script only uses the `.storage` and `show storage=xxxx` bconsole
     commands, so you may consider using a non-privileged Console configured in
     the Director to limit access.
@@ -119,7 +121,7 @@ local_script_dir = '/opt/comm-bacula/include/scripts'
 # Where to upload the script on the remote servers
 # ------------------------------------------------
 local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to keep history of reports
-remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user
+remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user on the remote hosts
 
 # --------------------------------------------------
 # Nothing should need to be modified below this line
