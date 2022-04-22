@@ -233,16 +233,17 @@ reldate = 'April 22, 2022'
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--ALL | SD...)
+    get_bsys_reports.py (--ALL | SD...) [-m <mask>]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
 Options:
-    --ALL          Get reports from the (local) DIR and all Storage Resources defined in Director configuration
-    SD...          Get reports from specific Storage resources (ie: get_bsys_reports.py SD_01 SD_02 SD_03)
+    --ALL              Get reports from the (local) DIR and all Storage Resources defined in Director configuration
+    SD...              Get reports from specific Storage resources (ie: get_bsys_reports.py SD_01 SD_02 SD_03)
+    -m, --mask <mask>  Ticket mask ID or company name. The tar file of bsys reports will have this prepended to it
 
-    -h, --help     Print this help message
-    -v, --version  Print the script name and version
+    -h, --help         Print this help message
+    -v, --version      Print the script name and version
 
 """
 
@@ -260,13 +261,16 @@ errors = 0
 
 # Get the ticket mask or company name to name the .tgz file
 # ---------------------------------------------------------
-while True:
-    mask = input('  - Enter the ticket mask (preferred) or your company name (no spaces): ')
-    if ' ' in mask or len(mask) == 0:
-        print('    - Input must not contain spaces, and must not be empty. Try again.')
-    else:
-        tar_filename = mask + '_' + now + '.tgz'
-        break
+if args['--mask'] != None:
+    mask = args['--mask']
+else:
+    while True:
+        mask = input('  - Enter the ticket mask (preferred) or your company name (no spaces): ')
+        if ' ' in mask or len(mask) == 0:
+            print('    - Input must not contain spaces, and must not be empty. Try again.')
+        else:
+            break
+tar_filename = mask + '_' + now + '.tgz'
 
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
