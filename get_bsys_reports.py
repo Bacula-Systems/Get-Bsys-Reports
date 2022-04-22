@@ -186,7 +186,7 @@ def get_ip_address(address, type = None):
     if is_ip_address(address):
         print('        - ' + address + ' is an IP address')
         if type == 'dir':
-            print('          - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
+            print('          - Adding Director\'s IP address ' + address + ' to list of hosts to retrieve report from.')
             host_dict['Director'] = address 
         return address
     else:
@@ -273,7 +273,7 @@ else:
             print('    - Input must not contain spaces, and must not be empty. Try again.')
         else:
             break
-tar_filename = mask + '_' + now + '.tgz'
+tar_filename = mask + '_' + now + '.tar'
 
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
@@ -426,7 +426,7 @@ else:
     tar_err = False
     print(colored('  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
-        result = subprocess.run('cd ' + local_tmp_dir + '; tar -cvzf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
+        result = subprocess.run('cd ' + local_tmp_dir + '; tar -cvf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
     except:
         errors += 1
         tar_err = True
