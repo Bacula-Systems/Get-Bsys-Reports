@@ -132,14 +132,10 @@ sudo_user = ''
 # -----------------------------------------------------
 bc_bin = '/opt/bacula/bin/bconsole'
 bc_cfg = '/opt/bacula/etc/bconsole.conf'
-# bc_bin = '/opt/comm-bacula/sbin/bconsole'
-# bc_cfg = '/opt/comm-bacula/etc/centos7_bconsole.conf'
-# bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
 
 # Define the location of the local bsys_report.pl
 # -----------------------------------------------
 local_script_name = 'bsys_report.pl'
-# local_script_dir = '/opt/comm-bacula/include/scripts'
 local_script_dir = './'
 
 # Where to upload the script on the remote servers
@@ -286,7 +282,7 @@ remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
 
-# Get the ticket mask or company name to name the .tgz file
+# Get the ticket mask or company name to name the .tar file
 # ---------------------------------------------------------
 if args['--mask'] != None:
     mask = args['--mask']
@@ -312,7 +308,7 @@ except:
     sys.exit(1)
 
 if args['--ALL']:
-    print(colored('\n  - Option \'--All\' provided on command line. Will attempt to get reports from local DIR and all SDs.', 'white', attrs=['bold']))
+    print(colored('\n  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     storage_lst = all_storage_lst
 else:
     print(colored('\n  - The following Storage/Autochanger resource' + ('s were' if len(args['SD']) > 1 else ' was') + ' provided on the command line: ', 'white', attrs=['bold']) + colored(", ".join(args['SD']), 'yellow'))
@@ -374,6 +370,9 @@ else:
     reports = 0
     for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
+        # I am surely doing this wrong for sudo use, but in limited testing,
+        # it worked. This needs to be inspected further.
+        # ------------------------------------------------------------------
         c = Connection(host = host, user = ssh_user)
         # c.close()
         # c = Connection(host=host, user=user, connect_kwargs={'allow_agent': True})
