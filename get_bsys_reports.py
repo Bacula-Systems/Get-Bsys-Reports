@@ -272,7 +272,11 @@ Options:
 
 # Assign docopt doc string variable
 # ---------------------------------
-args = docopt(doc_opt_str, version='\n' + progname + ' - v' + version + '\n' + reldate + '\n')
+args = docopt(doc_opt_str, version='\n' \
++ progname + ' - v' + version \
++ '\n' + reldate + '\n' \
++ 'Written by: Bill Arlofski\n' \
++ 'Copyright® Bacula Systems, SA 2022\n')
 
 # Print startup message and create some global variables
 # ------------------------------------------------------
@@ -282,8 +286,8 @@ remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
 
-# Get the ticket mask or company name to name the .tar file
-# ---------------------------------------------------------
+# Get the ticket mask or company name to prepend to the .tar file name
+# --------------------------------------------------------------------
 if args['--mask'] != None:
     mask = args['--mask']
 else:
@@ -311,7 +315,10 @@ if args['--ALL']:
     print(colored('\n  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     storage_lst = all_storage_lst
 else:
-    print(colored('\n  - The following Storage/Autochanger resource' + ('s were' if len(args['SD']) > 1 else ' was') + ' provided on the command line: ', 'white', attrs=['bold']) + colored(", ".join(args['SD']), 'yellow'))
+    print(colored('\n  - The following Storage/Autochanger resource' \
+          + ('s were' if len(args['SD']) > 1 else ' was') \
+          + ' provided on the command line: ', 'white', attrs=['bold']) \
+          + colored(", ".join(args['SD']), 'yellow'))
     print('    - Checking validity of given Storage/Autochanger resources.')
     for st in args['SD']:
         if st in all_storage_lst:
@@ -326,16 +333,19 @@ else:
 # ----------------------------------------------------------------
 host_dict = {}
 print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
-+ 'Storage resource' + ('s' if len(storage_lst) > 1 else '') + ' and creating unique host list.', 'white', attrs=['bold']))
+      + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') \
+      + ' and creating unique host list.', 'white', attrs=['bold']))
 
 if args['--ALL']:
     dir_name, dir_address = get_dir_info()
-    print(colored('    - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
+    print(colored('    - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' \
+          + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
     get_ip_address(dir_address, 'dir')
 
 for st in storage_lst:
     address = get_storage_address(st)
-    print(colored('    - Storage: ', 'green') + colored(st, 'yellow') + ', ' + colored('Address: ', 'green') + colored(address, 'yellow'))
+    print(colored('    - Storage: ', 'green') + colored(st, 'yellow') + ', ' \
+          + colored('Address: ', 'green') + colored(address, 'yellow'))
 
     # Now determine if address is FQDN/host or IP address.
     # If address is FQDN/host, perform a DNS lookup to get
@@ -352,7 +362,8 @@ for st in storage_lst:
         print('        - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
         host_dict[st] = ip
     else:
-        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' + st + '" (' + ip + ') already in list. Skipping...')
+        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' \
+              + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each qualified host
 # --------------------------------------------
@@ -371,11 +382,11 @@ else:
     for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
         # I am surely doing this wrong for sudo use, but in limited testing,
-        # it worked. This needs to be inspected further.
+        # it worked. I think I need to c.close() and re-open for the c.run()
+        # This needs to be inspected further.
         # ------------------------------------------------------------------
         c = Connection(host = host, user = ssh_user)
         # c.close()
-        # c = Connection(host=host, user=user, connect_kwargs={'allow_agent': True})
 
         # Upload the local bsys report generator script to the remote host with
         # a timestamped filename to prevent overwrites or permission issues
@@ -385,7 +396,8 @@ else:
             result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
         except:
             errors += 1
-            print(colored('        - Problem uploading ' + local_script_dir + '/' + local_script_name + ' to ' + remote_tmp_dir, 'red'))
+            print(colored('        - Problem uploading ' + local_script_dir + '/' \
+                  + local_script_name + ' to ' + remote_tmp_dir, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
@@ -406,7 +418,8 @@ else:
                 result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
         except:
             errors += 1
-            print(colored('        - Problem encountered while trying to run remote script ' + host + ':' + remote_script_name, 'red'))
+            print(colored('        - Problem encountered while trying to run remote script ' \
+                  + host + ':' + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
@@ -446,7 +459,8 @@ else:
             reports += 1
         except:
             errors += 1
-            print(colored('        - Problem encountered while trying to download remote bsys report ' + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file, 'red'))
+            print(colored('        - Problem encountered while trying to download remote bsys report ' \
+                  + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
@@ -476,9 +490,10 @@ else:
         print(colored('    - Done\n', 'green'))
         if len(host_dict) >= 1:
             print(colored('  - ' + ('All ' if len(host_dict) > 1 else 'The ') + 'bsys report' \
-                + ('s' if len(host_dict) > 1 else '') + (' is' if len(host_dict) == 1 else ' are') \
-                + ' available in directory: ', 'white', attrs=['bold']) + colored(local_tmp_dir, 'yellow'))
-        print(colored('  - Archive (tgz) of all reports available as: ', 'white', attrs=['bold']) + colored(local_tmp_dir + '/' + tar_filename, 'yellow'))
+                  + ('s' if len(host_dict) > 1 else '') + (' is' if len(host_dict) == 1 else ' are') \
+                  + ' available in directory: ', 'white', attrs=['bold']) + colored(local_tmp_dir, 'yellow'))
+        print(colored('  - Archive (tgz) of all reports available as: ', 'white', attrs=['bold']) \
+              + colored(local_tmp_dir + '/' + tar_filename, 'yellow'))
 if errors > 0:
     print(colored('  - (' + str(errors) + ') Errors were detected during script run. Please check output above!', 'red', attrs=['bold']))
 print(colored('- Script complete.\n', 'green', attrs=['bold']))
