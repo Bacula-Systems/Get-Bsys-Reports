@@ -1,8 +1,31 @@
 #!/usr/bin/python3
 
-# 20220422 - waa - Initial release
-# --------------------------------
+# ------------------------------------------------------------------------
+#  Bacula® - The Network Backup Solution
+
+#  Copyright (C) 2000-2022 Bacula Systems SA
+#  All rights reserved.
+#
+#  The main author of Bacula is Kern Sibbald, with contributions from many
+#  others, a complete list can be found in the file AUTHORS.
+#
+#  Licensees holding a valid Bacula Systems SA license may use this file
+#  and others of this release in accordance with the proprietary license
+#  agreement provided in the LICENSE file.  Redistribution of any part of
+#  this release is not permitted.
+#
+#  Bacula® is a registered trademark of Kern Sibbald.
+#
+#  Script to automatically collect bsys reports from Director and
+#  all (or specific) Storage/Autochanger resources in Director's
+#  configuration.
+#
+#  Written by Bill Arlofski, April 2022
+# ------------------------------------------------------------------------
 """
+--------------------------------
+20220422 - waa - Initial release
+--------------------------------
 ------------
 INSTRUCTIONS
 ------------
@@ -93,7 +116,7 @@ INSTRUCTIONS
 
 """
 
-#
+# -----------------------------------------------------
 # SET SOME VARIABLES SPECIFIC TO THE LOCAL ENVIRONMENT:
 # -----------------------------------------------------
 # Define the ssh user to use when connecting to remote systems
@@ -107,16 +130,17 @@ sudo_user = ''
 
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
-# bc_bin = '/opt/bacula/bin/bconsole'
-# bc_cfg = '/opt/bacula/etc/bconsole.conf'
-bc_bin = '/opt/comm-bacula/sbin/bconsole'
+bc_bin = '/opt/bacula/bin/bconsole'
+bc_cfg = '/opt/bacula/etc/bconsole.conf'
+# bc_bin = '/opt/comm-bacula/sbin/bconsole'
 # bc_cfg = '/opt/comm-bacula/etc/centos7_bconsole.conf'
-bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
+# bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
 
 # Define the location of the local bsys_report.pl
 # -----------------------------------------------
 local_script_name = 'bsys_report.pl'
-local_script_dir = '/opt/comm-bacula/include/scripts'
+# local_script_dir = '/opt/comm-bacula/include/scripts'
+local_script_dir = './'
 
 # Where to upload the script on the remote servers
 # ------------------------------------------------
@@ -329,7 +353,7 @@ for st in storage_lst:
     # but only if the IP address does not exist in values
     # ---------------------------------------------------
     if ip not in host_dict.values():
-        print('      - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
+        print('        - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
         host_dict[st] = ip
     else:
         print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' + st + '" (' + ip + ') already in list. Skipping...')
@@ -404,8 +428,8 @@ else:
         # --------------------------------------------------
         # Use a dictionary comprehension to invert the keys and values
         # of the 'host_dict' dictionary so we can get the name of the
-        # host (or 'Director' in the case of a Director IP), from the
-        # IP address as the key.
+        # Storage (or 'Director' in the case of a Director IP), from
+        # the IP address as the key.
         # https://peps.python.org/pep-0274/
         # https://stackoverflow.com/a/18043402
         # ------------------------------------------------------------
@@ -437,8 +461,8 @@ if len(host_dict) <= 1:
         print(colored('  - No bsys reports retrieved.', 'red'))
     elif len(host_dict) == 1:
         print(colored('  - Only one bsys report retrieved.', 'white', attrs=['bold']))
-        print('    - Not creating tarball of one file.')
-        print(colored('  - The one bsys report is located in: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
+        print('    - Not creating a tarball of one file.')
+        print(colored('  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
 else:
     tar_err = False
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
@@ -448,7 +472,7 @@ else:
         errors += 1
         tar_err = True
         print(colored('    - Problem encountered while trying to tar bsys reports.', 'red'))
-        print(colored('    - Please check the local directory ', 'red') + local_tmp_dir)
+        print(colored('    - Please check the local directory: ', 'red') + local_tmp_dir)
     if tar_err == False:
         print(colored('    - Done\n', 'green'))
         if len(host_dict) >= 1:
