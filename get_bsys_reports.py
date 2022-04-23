@@ -187,7 +187,7 @@ def get_ip_address(address, type = None):
         print('        - ' + address + ' is an IP address')
         if type == 'dir':
             print('          - Adding Director\'s IP address ' + address + ' to list of hosts to retrieve report from.')
-            host_dict['Director'] = address 
+            host_dict['Director'] = address
         return address
     else:
         print('        - ' + address + ' is not an IP address. Attempting to resolve...')
@@ -395,8 +395,25 @@ else:
 
         # Create a filename for the downloaded bsys report
         # that is pre-pended with the host's IP address
-        # ------------------------------------------------
-        local_dl_file = local_tmp_dir + '/' + os.path.basename(remote_dl_file)
+        # Prepend the local filename(s) of the downloaded
+        # bsys report(s) with DIR or SD, depending on which
+        # type it is. Even if the Director server has a
+        # Storage defined on it, if '--ALL' was used on the
+        # command line, the Director IP will always be first
+        # in the dictionary because we add it first.
+        # --------------------------------------------------
+        # Use a dictionary comprehension to invert the keys and values
+        # of the 'host_dict' dictionary so we can get the name of the
+        # host (or 'Director' in the case of a Director IP), from the
+        # IP address as the key.
+        # https://peps.python.org/pep-0274/
+        # https://stackoverflow.com/a/18043402
+        # ------------------------------------------------------------
+        res = {v: k for k, v in host_dict.items()}
+        if res[host] == 'Director':
+            local_dl_file = local_tmp_dir + '/' + 'DIR-' + os.path.basename(remote_dl_file)
+        else:
+            local_dl_file = local_tmp_dir + '/' + 'SD-' + os.path.basename(remote_dl_file)
 
         # Now download the report
         # -----------------------
