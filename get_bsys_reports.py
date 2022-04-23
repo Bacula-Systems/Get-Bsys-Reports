@@ -184,28 +184,28 @@ def get_ip_address(address, type = None):
     # -----------------------------------------------------------------------------------------------
     global errors
     if is_ip_address(address):
-        print('        - ' + address + ' is an IP address')
+        print('      - ' + address + ' is an IP address')
         if type == 'dir':
-            print('          - Adding Director\'s IP address ' + address + ' to list of hosts to retrieve report from.')
+            print('        - Adding Director\'s IP address ' + address + ' to list of hosts to retrieve report from.')
             host_dict['Director'] = address
         return address
     else:
-        print('        - ' + address + ' is not an IP address. Attempting to resolve...')
+        print('      - ' + address + ' is not an IP address. Attempting to resolve...')
         ip = resolve(address)
         if ip == False:
             errors += 1
-            print(colored('        - Oops, cannot resolve FQDN/host ', 'red') + colored('"' + address + '"', 'red'))
+            print(colored('      - Oops, cannot resolve FQDN/host ', 'red') + colored('"' + address + '"', 'red'))
             if type == 'dir':
-                print(colored('          - Will not attempt to retrieve report from Director', 'red') + colored('"' + dir_name + '"', 'red'))
+                print(colored('        - Will not attempt to retrieve report from Director', 'red') + colored('"' + dir_name + '"', 'red'))
                 return None
             else:
-                print(colored('            - Removing ', 'red') + colored('"' + st + '"', 'red') + colored(' from host list', 'red'))
+                print(colored('          - Removing ', 'red') + colored('"' + st + '"', 'red') + colored(' from host list', 'red'))
                 storage_lst.remove(st)
                 return 'removed'
         else:
-            print('          - FQDN/host ' + address + ' = ' + ip)
+            print('        - FQDN/host ' + address + ' = ' + ip)
             if type == 'dir':
-                print('          - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
+                print('        - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
                 host_dict['Director'] = ip
         return ip
 
@@ -279,7 +279,7 @@ tar_filename = mask + '_' + now + '.tar'
 # ----------------------------------------------------------------
 storage_lst = []
 try:
-    print(colored('\n  - Getting list of Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
+    print(colored('  - Getting list of Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
     all_storage_lst = get_storages()
     print('    - Found the following Storage/Autochanger resources: ' + colored(", ".join(all_storage_lst), 'yellow'))
 except:
@@ -288,11 +288,11 @@ except:
     sys.exit(1)
 
 if args['--ALL']:
-    print('  - Option \'--All\' provided on command line. Will attempt to get reports from local DIR and all SDs')
+    print(colored('\n  - Option \'--All\' provided on command line. Will attempt to get reports from local DIR and all SDs.', 'white', attrs=['bold']))
     storage_lst = all_storage_lst
 else:
     print(colored('\n  - The following Storage/Autochanger resource' + ('s were' if len(args['SD']) > 1 else ' was') + ' provided on the command line: ', 'white', attrs=['bold']) + colored(", ".join(args['SD']), 'yellow'))
-    print('    - Checking validity of given Storage/Atuochanger resources.')
+    print('    - Checking validity of given Storage/Autochanger resources.')
     for st in args['SD']:
         if st in all_storage_lst:
             print(colored('      - Storage ' + st + ' is valid.', 'green'))
@@ -305,17 +305,17 @@ else:
 # Create a dictionary of Storage resources defined in the Director
 # ----------------------------------------------------------------
 host_dict = {}
-print(colored('\n    - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
+print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
 + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') + ' and creating unique host list.', 'white', attrs=['bold']))
 
 if args['--ALL']:
     dir_name, dir_address = get_dir_info()
-    print(colored('\n      - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
+    print(colored('    - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
     get_ip_address(dir_address, 'dir')
 
 for st in storage_lst:
     address = get_storage_address(st)
-    print(colored('      - Storage: ', 'green') + colored(st, 'yellow') + ', ' + colored('Address: ', 'green') + colored(address, 'yellow'))
+    print(colored('    - Storage: ', 'green') + colored(st, 'yellow') + ', ' + colored('Address: ', 'green') + colored(address, 'yellow'))
 
     # Now determine if address is FQDN/host or IP address.
     # If address is FQDN/host, perform a DNS lookup to get
@@ -329,17 +329,17 @@ for st in storage_lst:
     # but only if the IP address does not exist in values
     # ---------------------------------------------------
     if ip not in host_dict.values():
-        print('        - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
+        print('      - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
         host_dict[st] = ip
     else:
-        print('        - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' + st + '" (' + ip + ') already in list. Skipping...')
+        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each qualified host
 # --------------------------------------------
 if len(host_dict) == 0:
     print(colored('\n  - There are no valid Storages/Autochangers to gather reports from!', 'red'))
 else:
-    print(colored('\n  - Will attempt to retrieve report' + ('' if len(host_dict) == 1 else 's') \
+    print(colored('\n  - Attempting to retrieve report' + ('' if len(host_dict) == 1 else 's') \
         + ' from server' + ('' if len(host_dict) == 1 else 's') \
         + ' with IP address' + ('' if len(host_dict) == 1 else 'es') \
         + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
@@ -426,7 +426,7 @@ else:
             print(colored('        - Problem encountered while trying to download remote bsys report ' + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
-        print(colored('        - Done\n', 'green'))
+        print(colored('        - Done', 'green'))
 
 # Create a tarball of all the downloaded bsys reports.
 # Skip tarring if there is only one file, and report
@@ -438,10 +438,10 @@ if len(host_dict) <= 1:
     elif len(host_dict) == 1:
         print(colored('  - Only one bsys report retrieved.', 'white', attrs=['bold']))
         print('    - Not creating tarball of one file.')
-        print('    - The one bsys report is located in: ' + colored(local_dl_file, 'yellow'))
+        print(colored('  - The one bsys report is located in: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
 else:
     tar_err = False
-    print(colored('  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
+    print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
         result = subprocess.run('cd ' + local_tmp_dir + '; tar -cvf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
     except:
