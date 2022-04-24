@@ -1,23 +1,21 @@
 #!/usr/bin/python3
-
 # ------------------------------------------------------------------------
 #  Bacula® - The Network Backup Solution
 
-#  Copyright (C) 2000-2022 Bacula Systems SA
-#  All rights reserved.
+#  Copyright (C) 2000-2022 Bacula Systems SA All rights reserved.
 #
 #  The main author of Bacula is Kern Sibbald, with contributions from many
 #  others, a complete list can be found in the file AUTHORS.
 #
-#  Licensees holding a valid Bacula Systems SA license may use this file
-#  and others of this release in accordance with the proprietary license
-#  agreement provided in the LICENSE file.  Redistribution of any part of
-#  this release is not permitted.
+#  Licensees holding a valid Bacula Systems SA license may use this file and
+#  others of this release in accordance with the proprietary license agreement
+#  provided in the LICENSE file.  Redistribution of any part of this release is
+#  not permitted.
 #
 #  Bacula® is a registered trademark of Kern Sibbald.
 #
-#  Script to automatically collect bsys reports from Director and
-#  all (or specific) Storage/Autochanger resources in Director's
+#  get_bsys_reports.py - Script to automatically collect bsys reports from
+#  Director and all (or specific) Storage/Autochanger resources in Director's
 #  configuration.
 #
 #  Written by Bill Arlofski, April 2022
@@ -250,7 +248,7 @@ from ipaddress import ip_address, IPv4Address
 # ------------------
 progname='Get Bsys Reports'
 version = '1.00'
-reldate = 'April 22, 2022'
+reldate = 'April 24, 2022'
 
 # Define the docopt string
 # ------------------------
@@ -363,7 +361,7 @@ for st in storage_lst:
         host_dict[st] = ip
     else:
         print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' \
-              + st + '" (' + ip + ') already in list. Skipping...')
+               + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each qualified host
 # --------------------------------------------
@@ -480,7 +478,7 @@ else:
     tar_err = False
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
-        result = subprocess.run('cd ' + local_tmp_dir + '; tar -cvf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
+        result = subprocess.run('cd ' + local_tmp_dir + '; tar -cf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
     except:
         errors += 1
         tar_err = True
@@ -492,8 +490,9 @@ else:
             print(colored('  - ' + ('All ' if len(host_dict) > 1 else 'The ') + 'bsys report' \
                   + ('s' if len(host_dict) > 1 else '') + (' is' if len(host_dict) == 1 else ' are') \
                   + ' available in directory: ', 'white', attrs=['bold']) + colored(local_tmp_dir, 'yellow'))
-        print(colored('  - Archive (tgz) of all reports available as: ', 'white', attrs=['bold']) \
+        print(colored('  - Archive (tar) of all reports available as: ', 'white', attrs=['bold']) \
               + colored(local_tmp_dir + '/' + tar_filename, 'yellow'))
 if errors > 0:
-    print(colored('  - (' + str(errors) + ') Errors were detected during script run. Please check output above!', 'red', attrs=['bold']))
+    print(colored('  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
+          + ' detected during script run. Please check the script output above!', 'red', attrs=['bold']))
 print(colored('- Script complete.\n', 'green', attrs=['bold']))
