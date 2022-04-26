@@ -75,7 +75,7 @@ INSTRUCTIONS
 - Now for the interesting REQUIRED things to be in place before this script
   can be successfully run:
 
-  - This script REQUIRES Python >= 3.9 to run.
+  - This script REQUIRES Python >= 3.6 to run.
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
   - You will need to download a current bsys report generator script from here:
