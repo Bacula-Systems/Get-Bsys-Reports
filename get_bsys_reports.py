@@ -153,14 +153,16 @@ remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user on the remote h
 # ---------------------
 def get_dir_info():
     'Get Director name and address'
-    status = subprocess.run('echo -e "quit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    cmd = f"echo -e 'quit\n' | {bc_bin} -c {bc_cfg}"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     name  = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
     address = re.sub('^Connecting to Director (.+?):.*', '\\1', status.stdout, flags=re.DOTALL)
     return name, address
 
 def get_storages():
     'Get the Storage/Autochangers defined in the Director.'
-    status = subprocess.run('echo -e ".storage\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    cmd = f"echo -e '.storage\nquit\n' | {bc_bin} -c {bc_cfg}"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
         print(colored('    - Problem in get_storages()...', 'red', attrs=['bold']))
         print(colored('- Reply from bconsole:', 'red'))
@@ -176,7 +178,9 @@ def get_storages():
 
 def get_storage_address(st):
     'Given a Director Storage/Autochanger name, return the IP address'
-    status = subprocess.run('echo -e "show storage=' + st + '\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    # status = subprocess.run('echo -e "show storage=' + st + '\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
+    cmd = f"echo -e 'show storage={st} \nquit\n' | {bc_bin} -c {bc_cfg}"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', status.stdout, flags=re.DOTALL)
 
 def is_ip_address(address):
@@ -247,8 +251,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.00'
-reldate = 'April 24, 2022'
+version = '1.01'
+reldate = 'April 26, 2022'
 
 # Define the docopt string
 # ------------------------
@@ -478,7 +482,9 @@ else:
     tar_err = False
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
-        result = subprocess.run('cd ' + local_tmp_dir + '; tar -cf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
+        cmd = f"cd {local_tmp_dir}; tar -cf {tar_filename} *.gz"
+        # result = subprocess.run('cd ' + local_tmp_dir + '; tar -cf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     except:
         errors += 1
         tar_err = True
