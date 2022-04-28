@@ -161,6 +161,7 @@ def get_dir_info():
 
 def get_storages():
     'Get the Storage/Autochangers defined in the Director.'
+    print(colored('\n  - Getting list of Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
     cmd = f"echo -e '.storage\nquit\n' | {bc_bin} -c {bc_cfg}"
     status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
@@ -168,13 +169,17 @@ def get_storages():
         print(colored('- Reply from bconsole:', 'red'))
         print('==========================================================\n' \
             + status.stdout + '==========================================================')
-        return False
+        print(colored('- Problem occurred while getting Storage/Autochanger resources from the Director!', 'red'))
+        print(colored('  - Exiting!\n', 'red'))
+        sys.exit(1)
     else:
         # I could not get this regex to work for 0 or 1 of 'You have messages.\n'... grrrrr
         # return re.sub('.*storage\n(.*)(You have messages.\n)?quit.*', '\\1', status.stdout, flags=re.DOTALL)
         # So I reverted to a .replace() on the status.stdout from subprocess.run first, then the re.sub
         yhmstripped = status.stdout.replace('You have messages.\n', '')
-        return re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
+        storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
+        print('    - Found the following Storage/Autochanger resources: ' + colored(", ".join(storages_split), 'yellow'))
+        return storages_split
 
 def get_storage_address(st):
     'Given a Director Storage/Autochanger name, return the IP address'
@@ -251,20 +256,21 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.01'
-reldate = 'April 26, 2022'
+version = '1.02'
+reldate = 'April 27, 2022'
 
 # Define the docopt string
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--ALL | SD...) [-m <mask>]
+    get_bsys_reports.py (--ALL | [--DIR] [SD...]) [-m <mask>]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
 Options:
-    --ALL              Get reports from the (local) DIR and all Storage Resources defined in Director configuration
-    SD...              Get reports from specific Storage resources (ie: get_bsys_reports.py SD_01 SD_02 SD_03)
+    --ALL              Get reports from the DIR and all Storage Resources defined in Director configuration
+    --DIR              Get a report from the Director. --ALL implies --DIR and these two are mutually exclusive
+    SD...              Get reports from specific Storage resources (ie: get_bsys_reports.py SD1 SD2 SD3)
     -m, --mask <mask>  Ticket mask ID or company name. The tar file of bsys reports will have this prepended to it
 
     -h, --help         Print this help message
@@ -304,41 +310,41 @@ tar_filename = mask + '_' + now + '.tar'
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
 storage_lst = []
-try:
-    print(colored('  - Getting list of Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
-    all_storage_lst = get_storages()
-    print('    - Found the following Storage/Autochanger resources: ' + colored(", ".join(all_storage_lst), 'yellow'))
-except:
-    print(colored('- Problem occurred while getting Storage/Autochanger resources from the Director!', 'red'))
-    print(colored('  - Exiting!\n', 'red'))
-    sys.exit(1)
-
 if args['--ALL']:
-    print(colored('\n  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
-    storage_lst = all_storage_lst
-else:
+    print(colored('  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
+    all_storage_lst = get_storages()
+elif args['--DIR']:
+    print(colored('  - Option \'--DIR\' provided on command line. Will attempt to get report from the Director.', 'white', attrs=['bold']))
+
+if len(args['SD']) > 0:
     print(colored('\n  - The following Storage/Autochanger resource' \
           + ('s were' if len(args['SD']) > 1 else ' was') \
           + ' provided on the command line: ', 'white', attrs=['bold']) \
           + colored(", ".join(args['SD']), 'yellow'))
     print('    - Checking validity of given Storage/Autochanger resources.')
-    for st in args['SD']:
-        if st in all_storage_lst:
-            print(colored('      - Storage ' + st + ' is valid.', 'green'))
-            storage_lst.append(st)
-        else:
-            print(colored('      - Storage ' + st + ' is not a valid Storage/Autochanger.', 'red'))
-            print(colored('        - Exiting.\n', 'red'))
-            sys.exit(1)
+    all_storage_lst = get_storages()
+
+if args['--ALL'] or len(args['SD']) > 0:
+    if not args['--ALL']:
+        for st in args['SD']:
+            if st in all_storage_lst:
+                print(colored('      - Storage "' + st + '" is valid.', 'green'))
+                storage_lst.append(st)
+            else:
+                print(colored('      - Storage "' + st + '" is not a valid Storage/Autochanger.', 'red'))
+                print(colored('        - Exiting.\n', 'red'))
+                sys.exit(1)
+    else:
+        storage_lst = all_storage_lst
 
 # Create a dictionary of Storage resources defined in the Director
 # ----------------------------------------------------------------
 host_dict = {}
 print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
-      + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') \
+      + ('All ' if len(storage_lst) > 1 else '') + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') \
       + ' and creating unique host list.', 'white', attrs=['bold']))
 
-if args['--ALL']:
+if args['--ALL'] or args['--DIR']:
     dir_name, dir_address = get_dir_info()
     print(colored('    - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' \
           + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
@@ -361,11 +367,11 @@ for st in storage_lst:
     # but only if the IP address does not exist in values
     # ---------------------------------------------------
     if ip not in host_dict.values():
-        print('        - Adding Storage "' + st + '" (' + ip + ') to gather bsys report from.')
+        print('        - Adding Storage "' + st + '" (' + ip + ') to list of hosts to retrieve report from.')
         host_dict[st] = ip
     else:
-        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') + '"' \
-               + st + '" (' + ip + ') already in list. Skipping...')
+        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
+               + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each qualified host
 # --------------------------------------------
@@ -397,6 +403,7 @@ else:
         try:
             result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
         except:
+            print(result)
             errors += 1
             print(colored('        - Problem uploading ' + local_script_dir + '/' \
                   + local_script_name + ' to ' + remote_tmp_dir, 'red'))
@@ -408,8 +415,8 @@ else:
         # capture the output to get the name of the report file
         # -----------------------------------------------------
         print('      - Running ' + ('(via sudo) ' if use_sudo == 'yes' else '') \
-        + ('as user ' + sudo_user + ' ' if sudo_user != '' else '') \
-        + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
+               + ('as user ' + sudo_user + ' ' if sudo_user != '' else '') \
+              + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
         try:
             if use_sudo == 'yes':
                 if sudo_user != '':
@@ -471,13 +478,12 @@ else:
 # Skip tarring if there is only one file, and report
 # the results.
 # ----------------------------------------------------
-if len(host_dict) <= 1:
-    if len(host_dict) == 0 or reports == 0:
-        print(colored('  - No bsys reports retrieved.', 'red'))
-    elif len(host_dict) == 1:
-        print(colored('  - Only one bsys report retrieved.', 'white', attrs=['bold']))
-        print('    - Not creating a tarball of one file.')
-        print(colored('  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
+if reports == 0:
+    print(colored('\n  - No bsys reports retrieved.', 'red'))
+elif reports == 1:
+    print(colored('\n  - Only one bsys report retrieved.', 'white', attrs=['bold']))
+    print('    - Not creating a tarball of one file.')
+    print(colored('\n  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
 else:
     tar_err = False
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
@@ -492,11 +498,11 @@ else:
         print(colored('    - Please check the local directory: ', 'red') + local_tmp_dir)
     if tar_err == False:
         print(colored('    - Done\n', 'green'))
-        if len(host_dict) >= 1:
-            print(colored('  - ' + ('All ' if len(host_dict) > 1 else 'The ') + 'bsys report' \
-                  + ('s' if len(host_dict) > 1 else '') + (' is' if len(host_dict) == 1 else ' are') \
+        if reports >= 1:
+            print(colored('  - ' + ('All ' if reports > 1 else 'The ') + 'bsys report' \
+                  + ('s' if reports > 1 else '') + (' is' if reports == 1 else ' are') \
                   + ' available in directory: ', 'white', attrs=['bold']) + colored(local_tmp_dir, 'yellow'))
-        print(colored('  - Archive (tar) of all reports available as: ', 'white', attrs=['bold']) \
+        print(colored('\n  - Archive (tar) of all reports available as: ', 'white', attrs=['bold']) \
               + colored(local_tmp_dir + '/' + tar_filename, 'yellow'))
 if errors > 0:
     print(colored('  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
