@@ -350,6 +350,7 @@ errors = 0
 # on the command line, the script assumes that '--ALL' was specified.
 # ----------------------------------------------------------------------------------
 if not args['--ALL'] and not args['--DIR'] and not args['SD']:
+    print(doc_opt_str)
     print(colored('  - Please specify one of \'--ALL\' or \'--DIR\', or one or more SDs, or \'--DIR\' and one or more SDs.', 'red'))
     print(colored('    - Examples:', 'red'))
     print(colored('        ./get_bsys_reports.py --ALL', 'red'))
@@ -358,6 +359,7 @@ if not args['--ALL'] and not args['--DIR'] and not args['SD']:
     print(colored('        ./get_bsys_reports.py --DIR SD1 SD2', 'red'))
     print(colored('        - Exiting.\n', 'red'))
     sys.exit(1)
+
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
 if args['--mask'] != None:
@@ -370,7 +372,6 @@ else:
         else:
             break
 tar_filename = mask + '_' + now + '.tar'
-
 
 # Do we get the current bsys report generator script
 # --------------------------------------------------
