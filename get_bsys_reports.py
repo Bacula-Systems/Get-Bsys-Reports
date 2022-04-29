@@ -110,6 +110,7 @@ INSTRUCTIONS
 
     # sudo pip3 install docopt
     # sudo pip3 install fabric
+    # sudo pip3 install requests
     # sudo pip3 install termcolor
 
 """
@@ -235,6 +236,55 @@ def get_ip_address(address, type = None):
                 host_dict['Director'] = ip
         return ip
 
+def get_bsys_report():
+    'Download the current bsys report generator script from Bacula Systems'
+    dl_file = now + '_bsys_report.tar.gz'
+    url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
+    print(colored('  - Option \'-g\' (--get-bsys-report) provided on command line. Downloading bsys_report.tar.gz', 'white', attrs=['bold']))
+    try:
+        response = requests.get(url)
+        if response.ok:
+            print('    - Successfully downloaded ' + url + ' to ' + local_tmp_root_dir +'/' + dl_file)
+            open(local_tmp_root_dir +'/' + dl_file, 'wb').write(response.content)
+    except:
+        print(colored('    - Error downloading bsys report generator script! (' + url + ')', 'red'))
+        print(colored('      - Exiting!\n', 'red'))
+        sys.exit(1)
+
+    # If everything OK, unpack the script and chmod +x it.
+    # ----------------------------------------------------
+    cmd = f"tar xvzf {local_tmp_root_dir}/{dl_file} -C {local_tmp_root_dir}"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if status.returncode == 0:
+        print('      - Successfully untarred ' + local_tmp_root_dir + '/' + dl_file + ' to ' + local_tmp_root_dir)
+    else:
+        print(colored('      - Error untarring file!', 'red'))
+        print(colored('      - Exiting!\n', 'red'))
+        sys.exit(1)
+
+    # Now we chmod +x the script
+    # --------------------------
+    cmd = f"chmod +x {local_tmp_root_dir}/bsys_report.pl"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if status.returncode == 0:
+        print('      - Successfully chmod +x ' + local_tmp_root_dir + '/bsys_report.pl')
+    else:
+        print(colored('      - Error chmod +x bsys_report.pl file!', 'red'))
+        print(colored('      - Exiting!\n', 'red'))
+        sys.exit(1)
+
+    # Now move the script
+    # -------------------
+    cmd = f"mv {local_tmp_root_dir}/bsys_report.pl {local_script_dir}/{local_script_name}"
+    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if status.returncode == 0:
+        print('      - Successfully moved ' + local_tmp_root_dir + '/bsys_report.pl' + ' to ' + local_script_dir)
+    else:
+        print(colored('      - Error moving bsys_report.pl file!', 'red'))
+        print(colored('      - Exiting!\n', 'red'))
+        sys.exit(1)
+    print('')
+
 # ------------
 # Begin script
 # ------------
@@ -245,6 +295,7 @@ import re
 import sys
 import socket
 import tempfile
+import requests
 import subprocess
 from docopt import docopt
 from datetime import datetime
@@ -255,25 +306,26 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.03'
+version = '1.04'
 reldate = 'April 29, 2022'
 
 # Define the docopt string
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--ALL | [--DIR] [SD...]) [-m <mask>]
+    get_bsys_reports.py (--ALL | [--DIR] [SD...]) [-m <mask>] [-g]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
 Options:
-    --ALL              Get reports from the DIR and all Storage Resources defined in Director configuration
-    --DIR              Get a report from the Director. --ALL implies --DIR and these two are mutually exclusive
-    SD...              Get reports from specific Storage resources (ie: get_bsys_reports.py SD1 SD2 SD3)
-    -m, --mask <mask>  Ticket mask ID or company name. The tar file of bsys reports will have this prepended to it
+    --ALL                  Get reports from the DIR and all Storage Resources defined in Director configuration
+    --DIR                  Get a report from the Director. --ALL implies --DIR and these two are mutually exclusive
+    SD...                  Get reports from specific Storage resources (ie: get_bsys_reports.py SD1 SD2 SD3)
+    -m, --mask <mask>      Ticket mask ID or company name. The tar file of bsys reports will have this prepended to it
+    -g, --get-bsys-report  Download current bsys report generator script from https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
 
-    -h, --help         Print this help message
-    -v, --version      Print the script name and version
+    -h, --help             Print this help message
+    -v, --version          Print the script name and version
 
 """
 
@@ -319,6 +371,12 @@ else:
             break
 tar_filename = mask + '_' + now + '.tar'
 
+
+# Do we get the current bsys report generator script
+# --------------------------------------------------
+if args['--get-bsys-report']:
+    get_bsys_report()
+
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
 storage_lst = []
@@ -326,7 +384,7 @@ if args['--ALL']:
     print(colored('  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     all_storage_lst = get_storages()
 elif args['--DIR']:
-    print(colored('  - Option \'--DIR\' provided on command line. Will attempt to get report from the Director.', 'white', attrs=['bold']))
+    print(colored('  - Option \'--DIR\' provided on command line. Will attempt to get report from the Director.\n', 'white', attrs=['bold']))
 
 if len(args['SD']) > 0:
     print(colored('  - The following Storage/Autochanger resource' \
