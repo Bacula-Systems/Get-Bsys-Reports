@@ -161,7 +161,7 @@ def get_dir_info():
 
 def get_storages():
     'Get the Storage/Autochangers defined in the Director.'
-    print(colored('\n  - Getting list of Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
+    print(colored('\n  - Getting list of all Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
     cmd = f"echo -e '.storage\nquit\n' | {bc_bin} -c {bc_cfg}"
     status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
@@ -178,13 +178,12 @@ def get_storages():
         # So I reverted to a .replace() on the status.stdout from subprocess.run first, then the re.sub
         yhmstripped = status.stdout.replace('You have messages.\n', '')
         storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
-        print('    - Found the following Storage/Autochanger resources: ' + colored(", ".join(storages_split), 'yellow'))
+        print('    - Found the following Storage/Autochanger resource' + ('s' if len(storages_split) > 1 else '') + ' configured in the Direcor: ' + colored(", ".join(storages_split), 'yellow'))
         return storages_split
 
 def get_storage_address(st):
     'Given a Director Storage/Autochanger name, return the IP address'
-    # status = subprocess.run('echo -e "show storage=' + st + '\nquit\n" | ' + bc_bin + ' -c ' + bc_cfg, shell=True, capture_output=True, text=True)
-    cmd = f"echo -e 'show storage={st} \nquit\n' | {bc_bin} -c {bc_cfg}"
+    cmd = f"echo -e 'show storage={st}\nquit\n' | {bc_bin} -c {bc_cfg}"
     status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', status.stdout, flags=re.DOTALL)
 
@@ -256,8 +255,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.02'
-reldate = 'April 27, 2022'
+version = '1.03'
+reldate = 'April 29, 2022'
 
 # Define the docopt string
 # ------------------------
@@ -294,13 +293,26 @@ remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
 
+# Need a workaround to solve the issue where I cannot seem to get the correct syntax
+# for docopt to understand the necessary logic. Without this, if nothing is provided
+# on the command line, the script assumes that '--ALL' was specified.
+# ----------------------------------------------------------------------------------
+if not args['--ALL'] and not args['--DIR'] and not args['SD']:
+    print(colored('  - Please specify one of \'--ALL\' or \'--DIR\', or one or more SDs, or \'--DIR\' and one or more SDs.', 'red'))
+    print(colored('    - Examples:', 'red'))
+    print(colored('        ./get_bsys_reports.py --ALL', 'red'))
+    print(colored('        ./get_bsys_reports.py --DIR', 'red'))
+    print(colored('        ./get_bsys_reports.py SD1 SD2', 'red'))
+    print(colored('        ./get_bsys_reports.py --DIR SD1 SD2', 'red'))
+    print(colored('        - Exiting.\n', 'red'))
+    sys.exit(1)
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
 if args['--mask'] != None:
     mask = args['--mask']
 else:
     while True:
-        mask = input('  - Enter the ticket mask (preferred) or your company name (no spaces): ')
+        mask = input(colored('  - Enter the ticket mask (preferred) or your company name (no spaces): ', 'white', attrs=['bold']))
         if ' ' in mask or len(mask) == 0:
             print('    - Input must not contain spaces, and must not be empty. Try again.')
         else:
@@ -317,11 +329,11 @@ elif args['--DIR']:
     print(colored('  - Option \'--DIR\' provided on command line. Will attempt to get report from the Director.', 'white', attrs=['bold']))
 
 if len(args['SD']) > 0:
-    print(colored('\n  - The following Storage/Autochanger resource' \
+    print(colored('  - The following Storage/Autochanger resource' \
           + ('s were' if len(args['SD']) > 1 else ' was') \
           + ' provided on the command line: ', 'white', attrs=['bold']) \
           + colored(", ".join(args['SD']), 'yellow'))
-    print('    - Checking validity of given Storage/Autochanger resources.')
+    print('    - Checking validity of provided Storage/Autochanger resource' + ('s' if len(args['SD']) > 1 else '') + '.')
     all_storage_lst = get_storages()
 
 if args['--ALL'] or len(args['SD']) > 0:
@@ -489,7 +501,6 @@ else:
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
         cmd = f"cd {local_tmp_dir}; tar -cf {tar_filename} *.gz"
-        # result = subprocess.run('cd ' + local_tmp_dir + '; tar -cf ' + tar_filename + ' *.gz', shell=True, capture_output=True, text=True)
         result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     except:
         errors += 1
