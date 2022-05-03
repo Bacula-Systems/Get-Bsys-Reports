@@ -34,7 +34,7 @@ INSTRUCTIONS
 
 - The idea and workflow of this script is as follows:
 
-  Given a command line option of '--ALL', this script will attempt to collect
+  Given a command line option of '--all', this script will attempt to collect
   bsys reports from the Director server and all the Storage/Autochanger
   resources defined in the Director's configuration.
 
@@ -306,26 +306,27 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.04'
-reldate = 'April 29, 2022'
+version = '1.05'
+reldate = 'May 03, 2022'
 
 # Define the docopt string
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--ALL | [--DIR] [SD...]) [-m <mask>] [-g]
+    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-m <mask>] [-c <bconfig>] [-g]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
 Options:
-    --ALL                  Get reports from the DIR and all Storage Resources defined in Director configuration
-    --DIR                  Get a report from the Director. --ALL implies --DIR and these two are mutually exclusive
-    SD...                  Get reports from specific Storage resources (ie: get_bsys_reports.py SD1 SD2 SD3)
-    -m, --mask <mask>      Ticket mask ID or company name. The tar file of bsys reports will have this prepended to it
-    -g, --get-bsys-report  Download current bsys report generator script from https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
+    --all                  Get reports from the Director and all Storage Resources defined in Director's configuration.
+    --dir                  Get a report from the Director. --all implies --dir and these two are mutually exclusive.
+    <st>...                Get reports from one or more specific Storage resources (ie: get_bsys_reports.py ST1 ST2 ST3).
+    -c, --bconfig          Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
+    -g, --get-bsys-report  Download current bsys report generator script from Bacula Systems' website.
+    -m, --mask <mask>      Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
 
-    -h, --help             Print this help message
-    -v, --version          Print the script name and version
+    -h, --help             Print this help message.
+    -v, --version          Print the script name and version.
 
 """
 
@@ -344,21 +345,6 @@ now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
-
-# Need a workaround to solve the issue where I cannot seem to get the correct syntax
-# for docopt to understand the necessary logic. Without this, if nothing is provided
-# on the command line, the script assumes that '--ALL' was specified.
-# ----------------------------------------------------------------------------------
-if not args['--ALL'] and not args['--DIR'] and not args['SD']:
-    print(doc_opt_str)
-    print(colored('  - Please specify one of \'--ALL\' or \'--DIR\', or one or more SDs, or \'--DIR\' and one or more SDs.', 'red'))
-    print(colored('    - Examples:', 'red'))
-    print(colored('        ./get_bsys_reports.py --ALL', 'red'))
-    print(colored('        ./get_bsys_reports.py --DIR', 'red'))
-    print(colored('        ./get_bsys_reports.py SD1 SD2', 'red'))
-    print(colored('        ./get_bsys_reports.py --DIR SD1 SD2', 'red'))
-    print(colored('        - Exiting.\n', 'red'))
-    sys.exit(1)
 
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
@@ -381,23 +367,23 @@ if args['--get-bsys-report']:
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
 storage_lst = []
-if args['--ALL']:
-    print(colored('  - Option \'--All\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
+if args['--all']:
+    print(colored('  - Option \'--all\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     all_storage_lst = get_storages()
-elif args['--DIR']:
-    print(colored('  - Option \'--DIR\' provided on command line. Will attempt to get report from the Director.\n', 'white', attrs=['bold']))
+elif args['--dir']:
+    print(colored('  - Option \'--dir\' provided on command line. Will attempt to get report from the Director.\n', 'white', attrs=['bold']))
 
-if len(args['SD']) > 0:
+if len(args['<st>']) > 0:
     print(colored('  - The following Storage/Autochanger resource' \
-          + ('s were' if len(args['SD']) > 1 else ' was') \
+          + ('s were' if len(args['<st>']) > 1 else ' was') \
           + ' provided on the command line: ', 'white', attrs=['bold']) \
-          + colored(", ".join(args['SD']), 'yellow'))
-    print('    - Checking validity of provided Storage/Autochanger resource' + ('s' if len(args['SD']) > 1 else '') + '.')
+          + colored(", ".join(args['<st>']), 'yellow'))
+    print('    - Checking validity of provided Storage/Autochanger resource' + ('s' if len(args['<st>']) > 1 else '') + '.')
     all_storage_lst = get_storages()
 
-if args['--ALL'] or len(args['SD']) > 0:
-    if not args['--ALL']:
-        for st in args['SD']:
+if args['--all'] or len(args['<st>']) > 0:
+    if not args['--all']:
+        for st in args['<st>']:
             if st in all_storage_lst:
                 print(colored('      - Storage "' + st + '" is valid.', 'green'))
                 storage_lst.append(st)
@@ -411,11 +397,11 @@ if args['--ALL'] or len(args['SD']) > 0:
 # Create a dictionary of Storage resources defined in the Director
 # ----------------------------------------------------------------
 host_dict = {}
-print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--ALL'] else '') \
+print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--all'] else '') \
       + ('All ' if len(storage_lst) > 1 else '') + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') \
       + ' and creating unique host list.', 'white', attrs=['bold']))
 
-if args['--ALL'] or args['--DIR']:
+if args['--all'] or args['--dir']:
     dir_name, dir_address = get_dir_info()
     print(colored('    - Director: ', 'green') + colored(dir_name, 'yellow') + ', ' \
           + colored('Address: ', 'green') + colored(dir_address, 'yellow'))
@@ -453,6 +439,15 @@ else:
         + ' from server' + ('' if len(host_dict) == 1 else 's') \
         + ' with IP address' + ('' if len(host_dict) == 1 else 'es') \
         + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
+
+    # Use a dictionary comprehension to invert the keys and values
+    # of the 'host_dict' dictionary so we can get the name of the
+    # Storage (or 'Director' in the case of a Director IP), from
+    # the IP address as the key.
+    # https://peps.python.org/pep-0274/
+    # https://stackoverflow.com/a/18043402
+    # ------------------------------------------------------------
+    rev_host_dict = {v: k for k, v in host_dict.items()}
 
     # Iterate through the unique hosts (IP addresses) identifed and then
     # upload the bsys_report.pl script, run it, and download the report
@@ -509,27 +504,16 @@ else:
         # ------------------------------------
         remote_dl_file = result.stdout.split()[3].replace(',', '')
 
-        # Create a filename for the downloaded bsys report
-        # that is pre-pended with the host's IP address
-        # Prepend the local filename(s) of the downloaded
-        # bsys report(s) with DIR or SD, depending on which
-        # type it is. Even if the Director server has a
-        # Storage defined on it, if '--ALL' was used on the
-        # command line, the Director IP will always be first
-        # in the dictionary because we add it first.
-        # --------------------------------------------------
-        # Use a dictionary comprehension to invert the keys and values
-        # of the 'host_dict' dictionary so we can get the name of the
-        # Storage (or 'Director' in the case of a Director IP), from
-        # the IP address as the key.
-        # https://peps.python.org/pep-0274/
-        # https://stackoverflow.com/a/18043402
+        # Create a filename for the downloaded bsys report that is
+        # pre-pended with the host's IP address Prepend the local
+        # filename(s) of the downloaded bsys report(s) with 'Director'
+        # or the Storage name depending on which type it is, followed
+        # by the IP address. Even if the Director server has a Storage
+        # defined on it, if '--all' was used on the command line, the
+        # Director IP will always be first in the dictionary because
+        # we add it first.
         # ------------------------------------------------------------
-        res = {v: k for k, v in host_dict.items()}
-        if res[host] == 'Director':
-            local_dl_file = local_tmp_dir + '/' + 'DIR-' + os.path.basename(remote_dl_file)
-        else:
-            local_dl_file = local_tmp_dir + '/' + 'SD-' + os.path.basename(remote_dl_file)
+        local_dl_file = local_tmp_dir + '/' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
 
         # Now download the report
         # -----------------------
