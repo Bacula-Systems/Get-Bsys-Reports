@@ -306,7 +306,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.05'
+version = '1.06'
 reldate = 'May 03, 2022'
 
 # Define the docopt string
@@ -318,15 +318,15 @@ Usage:
     get_bsys_reports.py -v | --version
 
 Options:
-    --all                  Get reports from the Director and all Storage Resources defined in Director's configuration.
-    --dir                  Get a report from the Director. --all implies --dir and these two are mutually exclusive.
-    <st>...                Get reports from one or more specific Storage resources (ie: get_bsys_reports.py ST1 ST2 ST3).
-    -c, --bconfig          Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
-    -g, --get-bsys-report  Download current bsys report generator script from Bacula Systems' website.
-    -m, --mask <mask>      Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
+    --all                    Get reports from the Director and all Storage Resources defined in Director's configuration.
+    --dir                    Get a report from the Director. --all implies --dir and these two are mutually exclusive.
+    <st>...                  Get reports from one or more specific Storage resources (ie: get_bsys_reports.py ST1 ST2 ST3).
+    -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
+    -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
+    -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
 
-    -h, --help             Print this help message.
-    -v, --version          Print the script name and version.
+    -h, --help               Print this help message.
+    -v, --version            Print the script name and version.
 
 """
 
@@ -358,6 +358,12 @@ else:
         else:
             break
 tar_filename = mask + '_' + now + '.tar'
+
+# Check if we have a bconsole config specified on the command line
+# Assign it if we do, otherwise use the default defined above
+# ----------------------------------------------------------------
+if args['--bconfig'] != None:
+    bc_cfg = args['--bconfig']
 
 # Do we get the current bsys report generator script
 # --------------------------------------------------
