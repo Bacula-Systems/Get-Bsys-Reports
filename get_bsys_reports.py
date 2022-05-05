@@ -347,6 +347,7 @@ from docopt import docopt
 from datetime import datetime
 from termcolor import colored
 from fabric import Connection
+from paramiko import ssh_exception
 from ipaddress import ip_address, IPv4Address
 
 # Set some variables
@@ -498,12 +499,12 @@ else:
         print('      - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
         try:
             result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
-        except:
-            print(result)
+        except Exception as e:
             errors += 1
-            print(colored('        - Problem uploading ' + local_script_dir + '/' \
+            print(colored('        - ' + str(e), 'red'))
+            print(colored('          - Problem uploading ' + local_script_dir + '/' \
                   + local_script_name + ' to ' + remote_tmp_dir, 'red'))
-            print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
+            print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
 
@@ -521,8 +522,9 @@ else:
                     result = c.sudo(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
             else:
                 result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
-        except:
+        except Exception as e:
             errors += 1
+            print(colored('        - ' + str(e), 'red'))
             print(colored('        - Problem encountered while trying to run remote script ' \
                   + host + ':' + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
@@ -548,10 +550,11 @@ else:
         try:
             result = c.get(remote_dl_file, local=local_dl_file)
             reports += 1
-        except:
+        except Exception as e:
             errors += 1
+            print(colored('        - ' + str(e), 'red'))
             print(colored('        - Problem encountered while trying to download remote bsys report ' \
-                  + host + ':' + remote_dl_file + '\n      as: ' + local_dl_file, 'red'))
+                  + host + ':' + remote_dl_file + '\n          as: ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
