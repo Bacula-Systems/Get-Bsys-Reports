@@ -20,6 +20,28 @@
 #
 #  Written by Bill Arlofski, April 2022
 # ------------------------------------------------------------------------
+
+# Define the docopt string
+# ------------------------
+doc_opt_str = """
+Usage:
+    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>]
+    get_bsys_reports.py -h | --help
+    get_bsys_reports.py -v | --version
+
+Options:
+    --all                    Get reports from the Director and all Storage Resources defined in Director's configuration.
+    --dir                    Get a report from the Director. --all implies --dir and these two are mutually exclusive.
+    <st>...                  Get reports from one or more specific Storage resources (ie: get_bsys_reports.py ST1 ST2 ST3).
+    -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
+    -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
+    -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
+
+    -h, --help               Print this help message.
+    -v, --version            Print the script name and version.
+
+"""
+
 """
 --------------------------------
 20220422 - waa - Initial release
@@ -28,83 +50,110 @@
 INSTRUCTIONS
 ------------
 
-- Please read ALL of these instructions before attempting to run this script.
-  There are a lot of moving parts, and there are a lot of things (external to
-  this script) that need to be working before using this script.
+- Please read ALL of these instructions before attempting to run this
+  script.  There are a lot of moving parts, and there are a lot of things
+  (external to this script) that need to be working before using this
+  script.
 
 - The idea and workflow of this script is as follows:
 
-  Given a command line option of '--all', this script will attempt to collect
-  bsys reports from the Director server and all the Storage/Autochanger
-  resources defined in the Director's configuration.
+  Given a command line option of '--all', this script will attempt to
+  collect bsys reports from the Director server and all the
+  Storage/Autochanger resources defined in the Director's configuration.
 
-  You will first be asked to enter the ticket mask that these bsys reports are
-  for (ie: TIA-91987-337), or your company name so that we know what ticket
-  these reports are for.
+  You will first be asked to enter the ticket mask that these bsys reports
+  are for (ie: TIA-91987-337), or your company name so that we know what
+  ticket these reports are for. You may use -m <mask> to provide this on
+  the command line to help automate collecting bsys reports from your
+  servers.
 
   For the Director and each Storage/Autochanger resource found in the
   Director's configuration, this script will then get the "Address=" and
-  determine if it is an IP address or not. If it is a host or FQDN, the script
-  will attempt to resolve it to an IP address. If the DNS lookup fails to
-  resolve the host/FQDN to an IP address it will flag an error and move on to
-  the next host, skipping this one.
+  determine if it is an IP address or not. If it is a hostname or FQDN, the
+  script will attempt to resolve it to an IP address. If the DNS lookup
+  fails to resolve the hostiname/FQDN to an IP address it will flag an
+  error and move on to the next host, skipping this one.
 
   Given names of Storage/Autochanger(s) on the command line, separated by
-  spaces, the script will get the list of Storage/Autochanger resources from the
-  Director, and then validate that each one that was provided on the command
-  line is in the Director's configuration. If any are not, the script will
-  print an error messages and exit.
+  spaces, the script will get the list of Storage/Autochanger resources
+  from the Director, and then validate that each one that was provided on
+  the command line is in the Director's configuration. If any are not, the
+  script will print an error message and exit.
 
   Once there is a valid list of Storage/Autochangers, the same process of
   getting an IP address for each one provided is performed.
 
-  This list is created in such a way that there are no duplicate IP addresses
-  so that only one report is gathered from each system.
+  This host list is created in such a way that there are no duplicate IP
+  addresses so that only one report is gathered from each system.
 
   Once we have the list of unique IP addresses, the script will iterate
-  through the list, upload the bsys_report.pl script file to the host, run the
-  script, grab the unique name of the report tgz file that will be
-  created, and when the script is finished, download the resulting report
-  file from the host into a local temporary directory.
+  through the list, upload the bsys_report.pl script file to the host, run
+  the script, grab the unique name of the report tgz file that will be
+  created, and when the script is finished running, download the resulting
+  report file from the host into a local temporary directory.
 
   When all reports are downloaded, if there are more than one, they will be
   tarred into one file that can be sent to Support.
 
   -----------------------------------------------------------------------------
 
-- Now for the interesting REQUIRED things to be in place before this script
-  can be successfully run:
+- Now for the REQUIRED things to be in place before this script can be
+  successfully run:
 
   - This script REQUIRES Python >= 3.6 to run.
+
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
-  - You will need to download a current bsys report generator script from here:
-    https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
-    untar/gunzip the perl `bsys_report.pl` script file, and set it executable.
-  - Edit the `local_script_name` and `local_script_dir` variables in this script
-    accordingly.
-  - You MUST have already created a public/private ssh key pair on the host that
-    will be running this script.
+
+  - If the system that this scrip will run on has Internet access, you can
+    use the '-g' (--get-bsys-report) command line option and the script
+    will automatically download the current bsys report generator script
+    from the Bacula Systems website, untar it, set it executable, and move
+    it to the 'local_script_dir' directory.
+
+  - If the system that will run this script does not have Internet access,
+    you will need to download a current bsys report generator script from
+    here: https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
+    untar/gunzip the perl `bsys_report.pl` script file inside, set it
+    executable, and copy it to the 'local_script_dir' directory.
+
+  - Edit the `local_script_name` and `local_script_dir` variables in this
+    script accordingly.
+
+  - You MUST have already created a private/public ssh key pair on the host
+    that will be running this script.
+
   - The public key must already be on each server that the script might need
     to retrieve a bsys report from.
+
   - The public key should be added to the ~/.ssh/authorized_keys file on the
     server of the user that the script will be connecting as (default `root`).
+
   - You must be running `ssh-agent` on the host that will run this script, and
     your private key MUST have already been added to it.
+
   - If you will be using a user other than `root` to connect to the remote
     hosts, there is the ability to use sudo to actually run the script. To do
     this, the `use_sudo` and `sudo_user` variables must be set properly.
+
   - Additionally, to use sudo, the user on each remote host must be allowed to
     run any command without being prompted for a password.
-  - The script does not need to be run on the Director! If it is run on a 
+
+  - The script does not need to be run on the Director! If it is run on a
     different host than the Director, then you must have bconsole installed on
     the host that will run the script, and a properly configured bconsole.conf
     configuration file that allows bconsole to communicate with the Director.
+
   - This script only uses the `.storage` and `show storage=xxxx` bconsole
     commands, so you may consider using a non-privileged Console configured in
-    the Director to limit access.
+    the Director to limit access to just these commands.
 
-  - REQUIRE MODULES:
+  - In a multi-Director environment, you may create a bconsole.conf file
+    for each Director, and then use the '-c' <bconfig> command line option
+    to tell the script which configuration file to use, and hence which
+    Director and Storages to connect to.
+
+  - REQUIRED MODULES:
 
     Before running this script, you will need to install several modules via pip:
 
@@ -115,9 +164,9 @@ INSTRUCTIONS
 
 """
 
-# -----------------------------------------------------
-# SET SOME VARIABLES SPECIFIC TO THE LOCAL ENVIRONMENT:
-# -----------------------------------------------------
+# ----------------------------------------------------
+# SET SOME VARIABLES SPECIFIC TO THE LOCAL ENVIRONMENT
+# ----------------------------------------------------
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
 ssh_user = 'root'
@@ -134,21 +183,17 @@ bc_cfg = '/opt/bacula/etc/bconsole.conf'
 
 # Define the location of the local bsys_report.pl
 # -----------------------------------------------
-local_script_name = 'bsys_report.pl'
 local_script_dir = './'
+local_script_name = 'bsys_report.pl'
 
 # Where to upload the script on the remote servers
 # ------------------------------------------------
-local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to keep history of reports
 remote_tmp_dir = '/tmp'      # Must be writeable by the ssh_user on the remote hosts
+local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to keep a history of reports
 
 # --------------------------------------------------
 # Nothing should need to be modified below this line
 # --------------------------------------------------
-
-# TODO: Maybe we add an option to download the latest bsys report generator
-# script https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
-# -------------------------------------------------------------------------
 
 # Define some functions
 # ---------------------
@@ -275,6 +320,7 @@ def get_bsys_report():
 
     # Now move the script
     # -------------------
+    local_script_name = 'bsys_report.pl'
     cmd = f"mv {local_tmp_root_dir}/bsys_report.pl {local_script_dir}/{local_script_name}"
     status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if status.returncode == 0:
@@ -306,29 +352,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.06'
-reldate = 'May 03, 2022'
-
-# Define the docopt string
-# ------------------------
-doc_opt_str = """
-Usage:
-    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-m <mask>] [-c <bconfig>] [-g]
-    get_bsys_reports.py -h | --help
-    get_bsys_reports.py -v | --version
-
-Options:
-    --all                    Get reports from the Director and all Storage Resources defined in Director's configuration.
-    --dir                    Get a report from the Director. --all implies --dir and these two are mutually exclusive.
-    <st>...                  Get reports from one or more specific Storage resources (ie: get_bsys_reports.py ST1 ST2 ST3).
-    -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
-    -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
-    -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
-
-    -h, --help               Print this help message.
-    -v, --version            Print the script name and version.
-
-"""
+version = '1.07'
+reldate = 'May 04, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -357,7 +382,6 @@ else:
             print('    - Input must not contain spaces, and must not be empty. Try again.')
         else:
             break
-tar_filename = mask + '_' + now + '.tar'
 
 # Check if we have a bconsole config specified on the command line
 # Assign it if we do, otherwise use the default defined above
@@ -511,14 +535,11 @@ else:
         remote_dl_file = result.stdout.split()[3].replace(',', '')
 
         # Create a filename for the downloaded bsys report that is
-        # pre-pended with the host's IP address Prepend the local
-        # filename(s) of the downloaded bsys report(s) with 'Director'
-        # or the Storage name depending on which type it is, followed
-        # by the IP address. Even if the Director server has a Storage
-        # defined on it, if '--all' was used on the command line, the
-        # Director IP will always be first in the dictionary because
-        # we add it first.
-        # ------------------------------------------------------------
+        # prepended with 'Director' or the Storage name depending on
+        # which type it is, followed by the IP address. If '--all' or
+        # '--dir' was used on the command line, the Director IP will
+        # always be first in the dictionary because we add it first.
+        # -----------------------------------------------------------
         local_dl_file = local_tmp_dir + '/' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
 
         # Now download the report
@@ -544,9 +565,18 @@ if reports == 0:
 elif reports == 1:
     print(colored('\n  - Only one bsys report retrieved.', 'white', attrs=['bold']))
     print('    - Not creating a tarball of one file.')
-    print(colored('\n  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(local_dl_file, 'yellow'))
+    print('    - Prepending bsys report filename with ticket mask "' + mask + '"')
+
+    # When only one report is receieved the 'host' variable will
+    # be leftover from the for loop above and is safe to use here
+    # -----------------------------------------------------------
+    new_local_dl_file = local_tmp_dir + '/' + mask + '_' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
+    cmd = f"mv {local_dl_file} {new_local_dl_file}"
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    print(colored('\n  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
 else:
     tar_err = False
+    tar_filename = mask + '_' + now + '.tar'
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
     try:
         cmd = f"cd {local_tmp_dir}; tar -cf {tar_filename} *.gz"
