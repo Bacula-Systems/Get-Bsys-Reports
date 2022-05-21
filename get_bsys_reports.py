@@ -273,7 +273,7 @@ def resolve(address):
         return False
 
 def get_ip_address(address, type = None):
-    'Give an address string, check if it is an IP, if not resolve it, add Director IP to host_dic'
+    'Given an address string, check if it is an IP, if not resolve it, add Director IP to host_dic'
     # Depending on type provided, (dir or st), print different messages and return different things
     # This is really ugly, but it prevents duplicate code for similar tasks for Director and Storages
     # -----------------------------------------------------------------------------------------------
@@ -640,4 +640,9 @@ else:
 if errors > 0:
     print(colored('  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
           + ' detected during script run. Please check the script output above!', 'red', attrs=['bold']))
+if '127.0.0.1' in host_dict.values():
+    print(colored('\n  - WARNING:', 'white', attrs=['bold']))
+    print(colored('    - The IP address \'127.0.0.1\' was detected in your Director\'s configuration.', 'red'))
+    print(colored('    - The report from this host might not be from the server you expect!', 'red'))
+    print(colored('    - Please do not use \'localhost\' or \'127.0.0.1\' for any of your \'Address=\' settings!', 'red'))
 print(colored('- Script complete.\n', 'green', attrs=['bold']))
