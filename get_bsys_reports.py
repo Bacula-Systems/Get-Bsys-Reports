@@ -196,8 +196,8 @@ local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to k
 
 # Define some functions
 # ---------------------
-def dir_conn_error():
-    print(colored(status.stdout))
+def dir_conn_error(status):
+    print(status)
     print(colored('    - Error connecting to the Director', 'red'))
     print(colored('      - Exiting!\n', 'red'))
     sys.exit(1)
@@ -210,7 +210,7 @@ def get_dir_info():
     # a status.returncode test works here
     # -------------------------------------
     if status.returncode != 0:
-        dir_conn_error()
+        dir_conn_error(status.stdout)
     else:
         name  = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
         address = re.sub('^Connecting to Director (.+?):.*', '\\1', status.stdout, flags=re.DOTALL)
@@ -225,7 +225,7 @@ def get_storages():
     # a status.returncode test works here
     # -------------------------------------
     if status.returncode != 0:
-        dir_conn_error()
+        dir_conn_error(status.stdout)
     else:
         if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
             print(colored('    - Problem in get_storages()...', 'red', attrs=['bold']))
@@ -252,7 +252,7 @@ def get_storage_address(st):
     # a status.returncode test works here
     # -------------------------------------
     if status.returncode != 0:
-        dir_conn_error()
+        dir_conn_error(status.stdout)
     else:
         return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', status.stdout, flags=re.DOTALL)
 
@@ -376,7 +376,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.09'
+version = '1.10'
 reldate = 'May 20, 2022'
 
 # Assign docopt doc string variable
