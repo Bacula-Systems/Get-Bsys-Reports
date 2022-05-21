@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# ------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 #  Bacula® - The Network Backup Solution
 
 #  Copyright (C) 2000-2022 Bacula Systems SA All rights reserved.
@@ -18,8 +18,8 @@
 #  Director and all (or specific) Storage/Autochanger resources in Director's
 #  configuration.
 #
-#  Written by Bill Arlofski, April 2022
-# ------------------------------------------------------------------------
+#  Initial version written by Bill Arlofski, April-May 2022
+# -----------------------------------------------------------------------------
 
 # Define the docopt string
 # ------------------------
@@ -57,43 +57,43 @@ INSTRUCTIONS
 
 - The idea and workflow of this script is as follows:
 
-  Given a command line option of '--all', this script will attempt to
-  collect bsys reports from the Director server and all the
-  Storage/Autochanger resources defined in the Director's configuration.
+    Given a command line option of '--all', this script will attempt to
+    collect bsys reports from the Director server and all the
+    Storage/Autochanger resources defined in the Director's configuration.
 
-  You will first be asked to enter the ticket mask that these bsys reports
-  are for (ie: TIA-91987-337), or your company name so that we know what
-  ticket these reports are for. You may use -m <mask> to provide this on
-  the command line to help automate collecting bsys reports from your
-  servers.
+    You will first be asked to enter the ticket mask that these bsys
+    reports are for (ie: TIA-91987-337), or your company name so that we
+    know what ticket these reports are for. You may use -m <mask> to
+    provide this on the command line to help automate collecting bsys
+    reports from your servers.
 
-  For the Director and each Storage/Autochanger resource found in the
-  Director's configuration, this script will then get the "Address=" and
-  determine if it is an IP address or not. If it is a hostname or FQDN, the
-  script will attempt to resolve it to an IP address. If the DNS lookup
-  fails to resolve the hostiname/FQDN to an IP address it will flag an
-  error and move on to the next host, skipping this one.
+    For the Director and each Storage/Autochanger resource found in the
+    Director's configuration, this script will then get the "Address=" and
+    determine if it is an IP address or not. If it is a hostname or FQDN,
+    the script will attempt to resolve it to an IP address. If the DNS
+    lookup fails to resolve the hostiname/FQDN to an IP address it will
+    flag an error and move on to the next host, skipping this one.
 
-  Given names of Storage/Autochanger(s) on the command line, separated by
-  spaces, the script will get the list of Storage/Autochanger resources
-  from the Director, and then validate that each one that was provided on
-  the command line is in the Director's configuration. If any are not, the
-  script will print an error message and exit.
+    Given names of Storage/Autochanger(s) on the command line, separated by
+    spaces, the script will get the list of Storage/Autochanger resources
+    from the Director, and then validate that each one that was provided on
+    the command line is in the Director's configuration. If any are not,
+    the script will print an error message and exit.
 
-  Once there is a valid list of Storage/Autochangers, the same process of
-  getting an IP address for each one provided is performed.
+    Once there is a valid list of Storage/Autochangers, the same process of
+    getting an IP address for each one provided is performed.
 
-  This host list is created in such a way that there are no duplicate IP
-  addresses so that only one report is gathered from each system.
+    This host list is created in such a way that there are no duplicate IP
+    addresses so that only one report is gathered from each system.
 
-  Once we have the list of unique IP addresses, the script will iterate
-  through the list, upload the bsys_report.pl script file to the host, run
-  the script, grab the unique name of the report tgz file that will be
-  created, and when the script is finished running, download the resulting
-  report file from the host into a local temporary directory.
+    Once we have the list of unique IP addresses, the script will iterate
+    through the list, upload the bsys_report.pl script file to the host,
+    run the script, grab the unique name of the report tgz file that will
+    be created, and when the script is finished running, download the
+    resulting report file from the host into a local temporary directory.
 
-  When all reports are downloaded, if there are more than one, they will be
-  tarred into one file that can be sent to Support.
+    When all reports are downloaded, if there are more than one, they will
+    be tarred into one file that can be sent to Support.
 
   -----------------------------------------------------------------------------
 
@@ -105,7 +105,7 @@ INSTRUCTIONS
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
 
-  - If the system that this scrip will run on has Internet access, you can
+  - If the system that this script will run on has Internet access, you can
     use the '-g' (--get-bsys-report) command line option and the script
     will automatically download the current bsys report generator script
     from the Bacula Systems website, untar it, set it executable, and move
@@ -117,50 +117,50 @@ INSTRUCTIONS
     untar/gunzip the perl `bsys_report.pl` script file inside, set it
     executable, and copy it to the 'local_script_dir' directory.
 
-  - Edit the `local_script_name` and `local_script_dir` variables in this
+  - Edit the `local_script_dir` and `local_script_name` variables in this
     script accordingly.
 
-  - You MUST have already created a private/public ssh key pair on the host
-    that will be running this script.
+  - If you do not want to put the ssh private key passphrase on the command
+    line or in this script, then the following recommended steps must be
+    taken first:
 
-  - The public key must already be on each server that the script might need
-    to retrieve a bsys report from.
+        - You MUST have already created a private/public ssh key pair on
+          the host that will be running this script.
 
-  - The public key should be added to the ~/.ssh/authorized_keys file on the
-    server of the user that the script will be connecting as (default `root`).
+        - The public key must already be on each server that the script
+          might need to retrieve a bsys report from.
 
-  - You must be running `ssh-agent` on the host that will run this script, and
-    your private key MUST have already been added to it.
+        - The public key should be added to the ~/.ssh/authorized_keys file
+          the user on the remote servers that the script will be connecting
+          as (default `root`).
 
-  - If you will be using a user other than `root` to connect to the remote
-    hosts, there is the ability to use sudo to actually run the script. To do
-    this, the `use_sudo` and `sudo_user` variables must be set properly.
-
-  - Additionally, to use sudo, the user on each remote host must be allowed to
-    run any command without being prompted for a password.
+        - If the private key has a passphrase, then you must be running
+          `ssh-agent` on the host that will run this script, and your
+          private key MUST have already been added to it.
 
   - The script does not need to be run on the Director! If it is run on a
-    different host than the Director, then you must have bconsole installed on
-    the host that will run the script, and a properly configured bconsole.conf
-    configuration file that allows bconsole to communicate with the Director.
-
-  - This script only uses the `.storage` and `show storage=xxxx` bconsole
-    commands, so you may consider using a non-privileged Console configured in
-    the Director to limit access to just these commands.
+    different host than the Director, then you must have bconsole installed
+    on the host that will run the script, and a properly configured
+    bconsole.conf configuration file(s) that allows bconsole to communicate
+    with the Director(s).
 
   - In a multi-Director environment, you may create a bconsole.conf file
     for each Director, and then use the '-c' <bconfig> command line option
     to tell the script which configuration file to use, and hence which
     Director and Storages to connect to.
 
+  - This script only uses the bconsole `.storage` and `show storage=xxxx`
+    commands, so you may consider using a non-privileged Console configured in
+    the Director to limit access to just these commands.
+
   - REQUIRED MODULES:
 
-    Before running this script, you will need to install several modules via pip:
+        Before running this script, you will need to install several
+        modules via pip:
 
-    # sudo pip3 install docopt
-    # sudo pip3 install fabric
-    # sudo pip3 install requests
-    # sudo pip3 install termcolor
+        # sudo pip3 install docopt
+        # sudo pip3 install requests
+        # sudo pip3 install termcolor
 
 """
 
@@ -170,11 +170,9 @@ INSTRUCTIONS
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
 ssh_user = 'root'
-
-# Should sudo be used to run commands on remote servers?
-# ------------------------------------------------------
-use_sudo = 'no'
-sudo_user = ''
+ssh_priv_key_pass = ''  # This is NOT recommended to set!
+                        # See above about setting up ssh-agent
+                        # or passphraseless ssh private key!
 
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
@@ -330,10 +328,10 @@ def get_bsys_report():
         print(colored('      - Exiting!\n', 'red'))
         sys.exit(1)
     print('')
+# ----------------
+# End of functions
+# ----------------
 
-# ------------
-# Begin script
-# ------------
 # Import modules and methods
 # --------------------------
 import os
@@ -344,17 +342,17 @@ import tempfile
 import requests
 import subprocess
 from docopt import docopt
+from scp import SCPClient
 from datetime import datetime
 from termcolor import colored
-from fabric import Connection
-from paramiko import ssh_exception
+from paramiko import SSHClient, ssh_exception, AutoAddPolicy
 from ipaddress import ip_address, IPv4Address
 
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.07'
-reldate = 'May 04, 2022'
+version = '1.08'
+reldate = 'May 20, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -461,8 +459,8 @@ for st in storage_lst:
         print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
                + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
-# Now get the reports from each qualified host
-# --------------------------------------------
+# Now get the reports from each host in the host_dict dictionary
+# --------------------------------------------------------------
 if len(host_dict) == 0:
     print(colored('\n  - There are no valid Storages/Autochangers to gather reports from!', 'red'))
 else:
@@ -472,33 +470,44 @@ else:
         + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
 
     # Use a dictionary comprehension to invert the keys and values
-    # of the 'host_dict' dictionary so we can get the name of the
-    # Storage (or 'Director' in the case of a Director IP), from
+    # of the host_dict dictionary so we can get the name of the
+    # Storage (or 'Director' in the case of a Director IP), using
     # the IP address as the key.
     # https://peps.python.org/pep-0274/
     # https://stackoverflow.com/a/18043402
     # ------------------------------------------------------------
     rev_host_dict = {v: k for k, v in host_dict.items()}
 
-    # Iterate through the unique hosts (IP addresses) identifed and then
-    # upload the bsys_report.pl script, run it, and download the report
-    # ------------------------------------------------------------------
+    # Iterate through the unique hosts (IP addresses) and then upload
+    # the bsys_report.pl script, run it, and download the report
+    # ---------------------------------------------------------------
     reports = 0
     for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
-        # I am surely doing this wrong for sudo use, but in limited testing,
-        # it worked. I think I need to c.close() and re-open for the c.run()
-        # This needs to be inspected further.
-        # ------------------------------------------------------------------
-        c = Connection(host = host, user = ssh_user)
-        # c.close()
+
+        # Set up and open the ssh connection to the host
+        # ----------------------------------------------
+        try:
+            print('      - Setting up ssh connection')
+            ssh = SSHClient()
+            ssh.load_system_host_keys()
+            ssh.set_missing_host_key_policy(AutoAddPolicy())
+            ssh.connect(host, username = ssh_user, timeout=5, password=ssh_priv_key_pass)
+        except Exception as e:
+            errors += 1
+            print(colored('        - ' + str(e), 'red'))
+            print(colored('          - Problem setting up ssh connection', 'red'))
+            continue
+        print(colored('        - Done', 'green'))
 
         # Upload the local bsys report generator script to the remote host with
-        # a timestamped filename to prevent overwrites or permission issues
+        # a timestamped filename to prevent overwrites or any permission issues
         # ---------------------------------------------------------------------
         print('      - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
         try:
-            result = c.put(local_script_dir + '/' + local_script_name, remote=remote_script_name)
+            scp = SCPClient(ssh.get_transport())
+            scp.put(local_script_dir + '/' + local_script_name, remote_path=remote_script_name)
+            scp.close()
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
@@ -511,17 +520,10 @@ else:
         # Run the uploaded bsys report generator script and
         # capture the output to get the name of the report file
         # -----------------------------------------------------
-        print('      - Running ' + ('(via sudo) ' if use_sudo == 'yes' else '') \
-               + ('as user ' + sudo_user + ' ' if sudo_user != '' else '') \
-              + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
+        print('      - Running ' + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
         try:
-            if use_sudo == 'yes':
-                if sudo_user != '':
-                    result = c.sudo(remote_script_name + ' -o ' + remote_tmp_dir, user=sudo_user, hide=True)
-                else:
-                    result = c.sudo(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
-            else:
-                result = c.run(remote_script_name + ' -o ' + remote_tmp_dir, hide=True)
+            stdin, stdout, stderr = ssh.exec_command(remote_script_name + ' -o ' + remote_tmp_dir)
+            result = stdout.readlines()
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
@@ -534,7 +536,7 @@ else:
         # Strip the comma off of the name that
         # was captured when the script was run
         # ------------------------------------
-        remote_dl_file = result.stdout.split()[3].replace(',', '')
+        remote_dl_file = result[0].split()[3].replace(',', '')
 
         # Create a filename for the downloaded bsys report that is
         # prepended with 'Director' or the Storage name depending on
@@ -548,7 +550,10 @@ else:
         # -----------------------
         print('      - Retrieving report ' + host + ':' + remote_dl_file)
         try:
-            result = c.get(remote_dl_file, local=local_dl_file)
+            # result = c.get(remote_dl_file, local=local_dl_file)
+            scp = SCPClient(ssh.get_transport())
+            scp.get(remote_dl_file, local_path=local_dl_file)
+            scp.close()
             reports += 1
         except Exception as e:
             errors += 1
@@ -558,6 +563,10 @@ else:
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
+
+        # Close the ssh connection
+        # ------------------------
+        ssh.close()
 
 # Create a tarball of all the downloaded bsys reports.
 # Skip tarring if there is only one file, and report
