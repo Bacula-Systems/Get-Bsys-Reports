@@ -25,7 +25,7 @@
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>]
+    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>] [-p <pass>]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
@@ -36,6 +36,7 @@ Options:
     -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
     -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
     -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
+    -p, --pass <pass>        SSH private key passphrase, or ssh user passphrase
 
     -h, --help               Print this help message.
     -v, --version            Print the script name and version.
@@ -369,6 +370,12 @@ now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
+
+# If the passphrase was entered on the command
+# line, set the ssh_priv_key_pass variable
+# --------------------------------------------
+if args['--pass'] != None:
+    ssh_priv_key_pass = args['--pass']
 
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
