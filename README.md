@@ -31,4 +31,5 @@ Options:
 ```
 
 ## Screenshot of Example Run:
+![get_bsys_reports-20220523_163420](https://user-images.githubusercontent.com/108133/169915835-1970b14e-557c-4715-9abe-90e06ce019e1.png)
 
