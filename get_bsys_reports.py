@@ -89,12 +89,13 @@ INSTRUCTIONS
 
     Once we have the list of unique IP addresses, the script will iterate
     through the list, upload the bsys_report.pl script file to the host,
-    run the script, grab the unique name of the report tgz file that will
+    run the script, grab the unique name of the report gzip file that will
     be created, and when the script is finished running, download the
     resulting report file from the host into a local temporary directory.
 
-    When all reports are downloaded, if there are more than one, they will
-    be tarred into one file that can be sent to Support.
+    When all reports are downloaded, if there is more than one, they will
+    be tarred into one file that can be sent to the Bacula Systems Support
+    Team.
 
   -----------------------------------------------------------------------------
 
@@ -105,6 +106,9 @@ INSTRUCTIONS
 
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
+
+  - Edit the `local_script_dir` and `local_script_name` variables in this
+    script accordingly.
 
   - If the system that this script will run on has Internet access, you can
     use the '-g' (--get-bsys-report) command line option and the script
@@ -118,26 +122,26 @@ INSTRUCTIONS
     untar/gunzip the perl `bsys_report.pl` script file inside, set it
     executable, and copy it to the 'local_script_dir' directory.
 
-  - Edit the `local_script_dir` and `local_script_name` variables in this
-    script accordingly.
-
   - If you do not want to put the ssh private key passphrase on the command
     line or in this script, then the following recommended steps must be
     taken first:
 
-        - You MUST have already created a private/public ssh key pair on
+        - You must have already created a private/public ssh key pair on
           the host that will be running this script.
 
-        - The public key must already be on each server that the script
-          might need to retrieve a bsys report from.
+        - The public key must already be on each Director and SD server
+          that the script might need to retrieve a bsys report from.
 
         - The public key should be added to the ~/.ssh/authorized_keys file
           the user on the remote servers that the script will be connecting
-          as (default `root`).
+          as (default `root`). The best way to do this is with the
+          `ssh-copy-id` utility.
 
         - If the private key has a passphrase, then you must be running
           `ssh-agent` on the host that will run this script, and your
-          private key MUST have already been added to it.
+          private key MUST have already been added to it. The keychain
+          utility is a nice way to add your ssh private keys to ssh-agent
+          on login.
 
   - The script does not need to be run on the Director! If it is run on a
     different host than the Director, then you must have bconsole installed
@@ -148,7 +152,7 @@ INSTRUCTIONS
   - In a multi-Director environment, you may create a bconsole.conf file
     for each Director, and then use the '-c' <bconfig> command line option
     to tell the script which configuration file to use, and hence which
-    Director and Storages to connect to.
+    Director and Storages to retreive bsys reports from.
 
   - This script only uses the bconsole `.storage` and `show storage=xxxx`
     commands, so you may consider using a non-privileged Console configured in
@@ -212,7 +216,7 @@ def get_dir_info():
     if status.returncode != 0:
         dir_conn_error(status.stdout)
     else:
-        name  = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
+        name = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
         address = re.sub('^Connecting to Director (.+?):.*', '\\1', status.stdout, flags=re.DOTALL)
         return name, address
 
@@ -236,8 +240,8 @@ def get_storages():
             print(colored('  - Exiting!\n', 'red'))
             sys.exit(1)
         else:
-            # I could not get this regex to work for 0 or 1 of 'You have messages.\n'... grrrrr
             # return re.sub('.*storage\n(.*)(You have messages.\n)?quit.*', '\\1', status.stdout, flags=re.DOTALL)
+            # I could not get this regex to work for 0 or 1 of 'You have messages.\n'... grrrrr
             # So I reverted to a .replace() on the status.stdout from subprocess.run first, then the re.sub
             yhmstripped = status.stdout.replace('You have messages.\n', '')
             storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
@@ -272,11 +276,12 @@ def resolve(address):
     except Exception:
         return False
 
-def get_ip_address(address, type = None):
+def get_ip_address(address, type=None):
     'Given an address string, check if it is an IP, if not resolve it, add Director IP to host_dic'
-    # Depending on type provided, (dir or st), print different messages and return different things
-    # This is really ugly, but it prevents duplicate code for similar tasks for Director and Storages
-    # -----------------------------------------------------------------------------------------------
+    # Depending on type provided, (dir or st), print different messages and
+    # return different things This is really ugly, and not very Pythonic, but
+    # it prevents duplicate code for similar tasks for Director and Storages
+    # -----------------------------------------------------------------------
     global errors
     if is_ip_address(address):
         print('      - ' + address + ' is an IP address')
@@ -376,8 +381,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.10'
-reldate = 'May 20, 2022'
+version = '1.11'
+reldate = 'May 23, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -404,12 +409,12 @@ if args['--pass'] != None:
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
 if args['--mask'] != None:
-    mask = args['--mask']
+    mask = re.sub('\s+', '_', args['--mask'])
 else:
     while True:
-        mask = input(colored('  - Enter the ticket mask (preferred) or your company name (no spaces): ', 'white', attrs=['bold']))
-        if ' ' in mask or len(mask) == 0:
-            print('    - Input must not contain spaces, and must not be empty. Try again.')
+        mask = re.sub('\s+', '_', input(colored('  - Enter the ticket mask (preferred) or your company name: ', 'white', attrs=['bold'])))
+        if len(mask) == 0:
+            print('    - Input must not be empty. Try again.')
         else:
             break
 
@@ -514,7 +519,7 @@ else:
     # ---------------------------------------------------------------
     reports = 0
     for host in host_dict.values():
-        print(colored('    - Working on host: ', 'green') + colored(host, 'yellow'))
+        print(colored('    - Working on host: ', 'green') + colored(host + ' (' + rev_host_dict[host] + ')', 'yellow'))
 
         # Set up and open the ssh connection to the host
         # ----------------------------------------------
@@ -523,7 +528,7 @@ else:
             ssh = SSHClient()
             ssh.load_system_host_keys()
             ssh.set_missing_host_key_policy(AutoAddPolicy())
-            ssh.connect(host, username = ssh_user, timeout=5, password=ssh_priv_key_pass)
+            ssh.connect(host, username=ssh_user, timeout=5, password=ssh_priv_key_pass)
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
@@ -534,7 +539,7 @@ else:
         # Upload the local bsys report generator script to the remote host with
         # a timestamped filename to prevent overwrites or any permission issues
         # ---------------------------------------------------------------------
-        print('      - Uploading ' + local_script_dir + '/' + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
+        print('      - Uploading ' + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
         try:
             scp = SCPClient(ssh.get_transport())
             scp.put(local_script_dir + '/' + local_script_name, remote_path=remote_script_name)
@@ -551,9 +556,13 @@ else:
         # Run the uploaded bsys report generator script and
         # capture the output to get the name of the report file
         # -----------------------------------------------------
-        print('      - Running ' + host + ':' + remote_script_name + ' -o ' + remote_tmp_dir)
+        print('      - Running ' + host + ':' + remote_script_name \
+              + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir)
+        remote_cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
         try:
-            stdin, stdout, stderr = ssh.exec_command(remote_script_name + ' -o ' + remote_tmp_dir)
+            # Only query storages if we are running on a Director
+            # ---------------------------------------------------
+            stdin, stdout, stderr = ssh.exec_command(remote_cmd)
             result = stdout.readlines()
         except Exception as e:
             errors += 1
@@ -581,7 +590,6 @@ else:
         # -----------------------
         print('      - Retrieving report ' + host + ':' + remote_dl_file)
         try:
-            # result = c.get(remote_dl_file, local=local_dl_file)
             scp = SCPClient(ssh.get_transport())
             scp.get(remote_dl_file, local_path=local_dl_file)
             scp.close()
@@ -607,7 +615,7 @@ if reports == 0:
     print(colored('\n  - No bsys reports retrieved.', 'red'))
 elif reports == 1:
     print(colored('\n  - Only one bsys report retrieved.', 'white', attrs=['bold']))
-    print('    - Not creating a tarball of one file.')
+    print('    - Not creating a tarball of one bsys report file.')
     print('    - Prepending bsys report filename with ticket mask "' + mask + '"')
 
     # When only one report is receieved the 'host' variable will
@@ -616,7 +624,7 @@ elif reports == 1:
     new_local_dl_file = local_tmp_dir + '/' + mask + '_' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
     cmd = f"mv {local_dl_file} {new_local_dl_file}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    print(colored('\n  - The one bsys report is here: ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
+    print(colored('\n  - The one bsys report file is here: ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
 else:
     tar_err = False
     tar_filename = mask + '_' + now + '.tar'
