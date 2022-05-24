@@ -2,6 +2,9 @@
 
 - Python script that allows you to collect bsys reports from the Director, and one, several, or all of the servers defined as Storages{} or Autochangers{} in your director configuration. Automatically identifies the Director IP address and all Storage IP addresses and then scp's a bsys report generator script to identified hosts, runs the script on each host remote, and then downloads the resulting report. If more than one report is downloaded, they are tarred into one file.
 
+**NOTE:** Please see the `INSTRUCTIONS` section near the top of the script. There are a lot of moving parts, and there are a lot of things
+(external to this script) that need to be working before this script can be successfully used.
+
 ```
 Usage:
 get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>] [-p <pass>]
