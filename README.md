@@ -26,11 +26,11 @@ Options:
 
 ## Example commands:
 ```
-# get_bsys_reports.py -dir            (Get a report from the Director)
-# get_bsys_reports.py -all            (Get report from Director and all Storages defined in Director configuration)
+# get_bsys_reports.py --dir           (Get a report from the Director)
+# get_bsys_reports.py --all           (Get report from Director and all Storages defined in Director configuration)
 # get_bsys_reports.py -g ST_1A        (Download current bsys report generator script and get report from one Storage)
 # get_bsys_reports.py ST_1 ST_2 ST_3  (Get report from three Storages)
-# get_bsys_reports.py -dir ST_4       (Get reports from Director and one Storage)
+# get_bsys_reports.py --dir ST_4      (Get reports from Director and one Storage)
 ```
 
 ## Screenshot of Example Run:
