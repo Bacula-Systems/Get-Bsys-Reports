@@ -245,7 +245,7 @@ def get_storages():
             # So I reverted to a .replace() on the status.stdout from subprocess.run first, then the re.sub
             yhmstripped = status.stdout.replace('You have messages.\n', '')
             storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
-            print('    - Found the following Storage/Autochanger resource' + ('s' if len(storages_split) > 1 else '') + ' configured in the Direcor: ' + colored(", ".join(storages_split), 'yellow'))
+            print('    - Found the following Storage/Autochanger resource' + ('s' if len(storages_split) > 1 else '') + ' configured in the Director: ' + colored(", ".join(storages_split), 'yellow'))
             return storages_split
 
 def get_storage_address(st):
@@ -372,7 +372,6 @@ import tempfile
 import requests
 import subprocess
 from docopt import docopt
-from scp import SCPClient
 from datetime import datetime
 from termcolor import colored
 from paramiko import SSHClient, ssh_exception, AutoAddPolicy
@@ -381,8 +380,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.11'
-reldate = 'May 23, 2022'
+version = '1.12'
+reldate = 'June 03, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -492,7 +491,7 @@ for st in storage_lst:
         print('        - Adding Storage "' + st + '" (' + ip + ') to list of hosts to retrieve report from.')
         host_dict[st] = ip
     else:
-        print('      - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
+        print('        - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
                + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each host in the host_dict dictionary
@@ -521,6 +520,25 @@ else:
     for host in host_dict.values():
         print(colored('    - Working on host: ', 'green') + colored(host + ' (' + rev_host_dict[host] + ')', 'yellow'))
 
+        # Upload the local bsys report generator script to the remote host with
+        # a timestamped filename to prevent overwrites or any permission issues
+        # ---------------------------------------------------------------------
+        print('      - Uploading ' + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
+        try:
+            cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
+            status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        except Exception as e:
+            errors += 1
+            print(colored('        - ' + str(e), 'red'))
+            print(colored('          - Problem uploading ' + local_script_dir + '/' \
+                  + local_script_name + ' to ' + remote_tmp_dir, 'red'))
+            print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
+            continue
+        print(colored('        - Done', 'green'))
+
+        # Run the uploaded bsys report generator script and
+        # capture the output to get the name of the report file
+        # -----------------------------------------------------
         # Set up and open the ssh connection to the host
         # ----------------------------------------------
         try:
@@ -535,27 +553,6 @@ else:
             print(colored('          - Problem setting up ssh connection', 'red'))
             continue
         print(colored('        - Done', 'green'))
-
-        # Upload the local bsys report generator script to the remote host with
-        # a timestamped filename to prevent overwrites or any permission issues
-        # ---------------------------------------------------------------------
-        print('      - Uploading ' + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
-        try:
-            scp = SCPClient(ssh.get_transport())
-            scp.put(local_script_dir + '/' + local_script_name, remote_path=remote_script_name)
-            scp.close()
-        except Exception as e:
-            errors += 1
-            print(colored('        - ' + str(e), 'red'))
-            print(colored('          - Problem uploading ' + local_script_dir + '/' \
-                  + local_script_name + ' to ' + remote_tmp_dir, 'red'))
-            print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
-            continue
-        print(colored('        - Done', 'green'))
-
-        # Run the uploaded bsys report generator script and
-        # capture the output to get the name of the report file
-        # -----------------------------------------------------
         print('      - Running ' + host + ':' + remote_script_name \
               + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir)
         remote_cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
@@ -572,6 +569,10 @@ else:
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
+
+        # Close the ssh connection
+        # ------------------------
+        ssh.close()
 
         # Strip the comma off of the name that
         # was captured when the script was run
@@ -590,9 +591,8 @@ else:
         # -----------------------
         print('      - Retrieving report ' + host + ':' + remote_dl_file)
         try:
-            scp = SCPClient(ssh.get_transport())
-            scp.get(remote_dl_file, local_path=local_dl_file)
-            scp.close()
+            cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
+            status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             reports += 1
         except Exception as e:
             errors += 1
@@ -602,10 +602,6 @@ else:
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
-
-        # Close the ssh connection
-        # ------------------------
-        ssh.close()
 
 # Create a tarball of all the downloaded bsys reports.
 # Skip tarring if there is only one file, and report
