@@ -200,6 +200,15 @@ local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to k
 
 # Define some functions
 # ---------------------
+def chmod_file(file):
+    try:
+        os.chmod(file, 0o755)
+    except Exception as e:
+        print(colored('      - Error chmod +x bsys_report.pl file!', 'red'))
+        print(colored('        ' + str(e), 'red'))
+        print(colored('        - Exiting!\n', 'red'))
+        sys.exit(1)
+
 def dir_conn_error(status):
     print(status)
     print(colored('    - Error connecting to the Director', 'red'))
@@ -316,17 +325,17 @@ def get_bsys_report():
     print(colored('  - Option \'-g\' (--get-bsys-report) provided on command line. Downloading bsys_report.tar.gz', 'white', attrs=['bold']))
     try:
         response = requests.get(url)
-        if response.ok:
-            print('    - Successfully downloaded ' + url + ' to ' + local_tmp_root_dir +'/' + dl_file)
-            open(local_tmp_root_dir +'/' + dl_file, 'wb').write(response.content)
-    except:
+        print('    - Successfully downloaded ' + url + ' to ' + local_tmp_root_dir +'/' + dl_file)
+        open(local_tmp_root_dir +'/' + dl_file, 'wb').write(response.content)
+    except Exception as e:
         print(colored('    - Error downloading bsys report generator script! (' + url + ')', 'red'))
+        print(colored('      ' + str(e), 'red'))
         print(colored('      - Exiting!\n', 'red'))
         sys.exit(1)
 
     # If everything OK, unpack the script and chmod +x it.
     # ----------------------------------------------------
-    cmd = f"tar xvzf {local_tmp_root_dir}/{dl_file} -C {local_tmp_root_dir}"
+    cmd = f"tar xzf {local_tmp_root_dir}/{dl_file} -C {local_tmp_root_dir}"
     status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if status.returncode == 0:
         print('      - Successfully untarred ' + local_tmp_root_dir + '/' + dl_file + ' to ' + local_tmp_root_dir)
@@ -337,14 +346,8 @@ def get_bsys_report():
 
     # Now we chmod +x the script
     # --------------------------
-    cmd = f"chmod +x {local_tmp_root_dir}/bsys_report.pl"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if status.returncode == 0:
-        print('      - Successfully chmod +x ' + local_tmp_root_dir + '/bsys_report.pl')
-    else:
-        print(colored('      - Error chmod +x bsys_report.pl file!', 'red'))
-        print(colored('      - Exiting!\n', 'red'))
-        sys.exit(1)
+    if os.access(local_tmp_root_dir + '/bsys_report.pl', os.X_OK) != True:
+        chmod_file(local_tmp_root_dir + '/bsys_report.pl')
 
     # Now move the script
     # -------------------
@@ -358,6 +361,7 @@ def get_bsys_report():
         print(colored('      - Exiting!\n', 'red'))
         sys.exit(1)
     print('')
+
 # ----------------
 # End of functions
 # ----------------
@@ -512,6 +516,11 @@ else:
     # https://stackoverflow.com/a/18043402
     # ------------------------------------------------------------
     rev_host_dict = {v: k for k, v in host_dict.items()}
+
+    # Make sure local bsys_report.pl script is executable before uploading
+    # --------------------------------------------------------------------
+    if os.access(local_script_dir + '/' + local_script_name, os.X_OK) != True:
+        chmod_file(local_script_dir + '/' + local_script_name)
 
     # Iterate through the unique hosts (IP addresses) and then upload
     # the bsys_report.pl script, run it, and download the report
