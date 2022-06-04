@@ -384,8 +384,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.12'
-reldate = 'June 03, 2022'
+version = '1.13'
+reldate = 'June 04, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
