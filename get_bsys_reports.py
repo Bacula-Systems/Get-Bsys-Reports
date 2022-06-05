@@ -210,19 +210,19 @@ def chmod_file(file):
         sys.exit(1)
 
 def get_local_ips():
+    'Get local IPv4 addresses and return as a list. Exit script if none ar found'
     cmd = f"ip a"
-    try:
-        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        lst = re.findall('.* inet (.+?)/.*', result.stdout)
-    except Excepton as e:
-        print(colored('      - Error getting local IP addresses with \'ip a\'', 'red'))
-        print(colored('      - SCP will be used for all IP address in hosts list', 'red'))
-        print(colored('        ' + str(e), 'red'))
-        return
-    return lst
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    lst = re.findall('.* inet (.+?)/.*', result.stdout)
+    if len(lst) == 0:
+        print(colored('      - Error getting local IPv4 addresses with \'ip a\'', 'red'))
+        print(colored('        - Exiting!', 'red'))
+        sys.exit(1)
+    else:
+        return lst
 
-def dir_conn_error(status):
-    print(status)
+def dir_conn_error(result):
+    print(result)
     print(colored('    - Error connecting to the Director', 'red'))
     print(colored('      - Exiting!\n', 'red'))
     sys.exit(1)
@@ -267,7 +267,9 @@ def get_storages():
             # ----------------------------------------------------------------------------------------------------
             yhmstripped = result.stdout.replace('You have messages.\n', '')
             storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
-            print('    - Found the following Storage/Autochanger resource' + ('s' if len(storages_split) > 1 else '') + ' configured in the Director: ' + colored(", ".join(storages_split), 'yellow'))
+            print('    - Found the following Storage/Autochanger resource' \
+                  + ('s' if len(storages_split) > 1 else '') + ' configured in the Director: ' \
+                  + colored(", ".join(storages_split), 'yellow'))
             return storages_split
 
 def get_storage_address(st):
@@ -397,7 +399,7 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.14'
+version = '1.15'
 reldate = 'June 05, 2022'
 
 # Assign docopt doc string variable
@@ -415,7 +417,6 @@ now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
-
 
 # Get a list of local IP address. If any of these end up in the host list
 # we will use cp instead of scp to send/retrieve files, and subprocess to
@@ -555,22 +556,22 @@ else:
         # ---------------------------------------------------------------------
         print('      - ' + ('Copying ' if host in local_ip_lst else 'Uploading ') \
               + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name \
-              + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else remote_tmp_dir))
-        try:
-            if host in local_ip_lst:
-                cmd = f"cp -a {local_script_dir}/{local_script_name} {remote_script_name}"
-                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-            else:
-                cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
-                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        except Exception as e:
+              + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else '') + remote_script_name)
+        if host in local_ip_lst:
+            cmd = f"cp -a {local_script_dir}/{local_script_name} {remote_script_name}"
+            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        else:
+            cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
+            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        if result.returncode == 0:
+            print(colored('        - Done', 'green'))
+        else:
             errors += 1
-            print(colored('        - ' + str(e), 'red'))
+            print(colored('        - ' + result.stderr, 'red'))
             print(colored('          - Problem ' + ('uploading ' if host not in local_ip_lst else 'copying ') + local_script_dir + '/' \
                   + local_script_name + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else remote_tmp_dir), 'red'))
             print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
             continue
-        print(colored('        - Done', 'green'))
 
         # Set up and open the ssh connection to the host
         # ----------------------------------------------
@@ -596,21 +597,23 @@ else:
         # The same command can be used for local and remote hosts
         # -------------------------------------------------------
         cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
-        try:
-            if host not in local_ip_lst:
-                stdin, stdout, stderr = ssh.exec_command(cmd)
-                result = stdout.readlines()
-            else:
-                result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        except Exception as e:
+        if host not in local_ip_lst:
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            result = stdout.readlines()
+            err = stderr.readlines()
+        else:
+            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            err = result.stderr
+        if result.returncode == 0:
+            print(colored('        - Done', 'green'))
+        else:
             errors += 1
-            print(colored('        - ' + str(e), 'red'))
+            print(colored('        - ' + err, 'red'))
             print(colored('        - Problem encountered while trying to run ' \
                   + ('remote' if host not in local_ip_lst else 'local') + ' script ' \
                   + (host + ':' if host not in local_ip_lst else '') + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
-        print(colored('        - Done', 'green'))
 
         # Close the ssh connection
         # ------------------------
@@ -638,24 +641,24 @@ else:
         print('      - ' + ('Copying ' if host in local_ip_lst else 'Downloading ') \
               + (ssh_user + '@' + host + ':' if host not in local_ip_lst else '') \
               + remote_dl_file + ' to:\n                ' + local_dl_file)
-        try:
-            if host in local_ip_lst:
-                cmd = f"cp -a {remote_dl_file} {local_dl_file}"
-                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-            else:
-                cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
-                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        if host in local_ip_lst:
+            cmd = f"cp -a {remote_dl_file} {local_dl_file}"
+            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        else:
+            cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
+            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        if result.returncode == 0:
             reports += 1
-        except Exception as e:
+            print(colored('        - Done', 'green'))
+        else:
             errors += 1
-            print(colored('        - ' + str(e), 'red'))
+            print(colored('        - ' + result.stderr, 'red'))
             print(colored('        - Problem encountered while trying to ' \
                   + ('download remote' if host not in local_ip_lst else 'copy') + ' bsys report ' \
-                  + (host + ':' + remote_dl_file if host not in local_ip_lst else remote_dl_file) \
+                  + (ssh_user + '@' + host + ':' + remote_dl_file if host not in local_ip_lst else '') + remote_dl_file \
                   + '\n          as:\n               ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
-        print(colored('        - Done', 'green'))
 
 # Create a tarball of all the downloaded bsys reports.
 # Skip tarring if there is only one file, and report
@@ -674,7 +677,7 @@ elif reports == 1:
     new_local_dl_file = local_tmp_dir + '/' + mask + '_' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
     cmd = f"mv {local_dl_file} {new_local_dl_file}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    print(colored('\n  - The one bsys report file is here: ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
+    print(colored('\n  - The one bsys report file is here:\n    ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
 else:
     tar_filename = mask + '_' + now + '.tar'
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
