@@ -209,6 +209,18 @@ def chmod_file(file):
         print(colored('        - Exiting!\n', 'red'))
         sys.exit(1)
 
+def get_local_ips():
+    cmd = f"ip a"
+    try:
+        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        lst = re.findall('.* inet (.+?)/.*', result.stdout)
+    except Excepton as e:
+        print(colored('      - Error getting local IP addresses with \'ip a\'', 'red'))
+        print(colored('      - SCP will be used for all IP address in hosts list', 'red'))
+        print(colored('        ' + str(e), 'red'))
+        return
+    return lst
+
 def dir_conn_error(status):
     print(status)
     print(colored('    - Error connecting to the Director', 'red'))
@@ -218,41 +230,42 @@ def dir_conn_error(status):
 def get_dir_info():
     'Get Director name and address'
     cmd = f"echo -e 'quit\n' | {bc_bin} -c {bc_cfg}"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    # A try test does not catch errors, but
-    # a status.returncode test works here
-    # -------------------------------------
-    if status.returncode != 0:
-        dir_conn_error(status.stdout)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    # A try test does not catch errors from bconsole,
+    # but a result.returncode test works here
+    # -----------------------------------------------
+    if result.returncode != 0:
+        dir_conn_error(result.stdout)
     else:
-        name = re.sub('^.* (.+?) Version:.*', '\\1', status.stdout, flags=re.DOTALL)
-        address = re.sub('^Connecting to Director (.+?):.*', '\\1', status.stdout, flags=re.DOTALL)
+        name = re.sub('^.* (.+?) Version:.*', '\\1', result.stdout, flags=re.DOTALL)
+        address = re.sub('^Connecting to Director (.+?):.*', '\\1', result.stdout, flags=re.DOTALL)
         return name, address
 
 def get_storages():
     'Get the Storage/Autochangers defined in the Director.'
     print(colored('\n  - Getting list of all Storage/Autochanger resources from the Director.', 'white', attrs=['bold']))
     cmd = f"echo -e '.storage\nquit\n' | {bc_bin} -c {bc_cfg}"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # A try test does not catch errors, but
-    # a status.returncode test works here
+    # a result.returncode test works here
     # -------------------------------------
-    if status.returncode != 0:
-        dir_conn_error(status.stdout)
+    if result.returncode != 0:
+        dir_conn_error(result.stdout)
     else:
-        if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', status.stdout, flags=re.DOTALL):
+        if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', result.stdout, flags=re.DOTALL):
             print(colored('    - Problem in get_storages()...', 'red', attrs=['bold']))
             print(colored('- Reply from bconsole:', 'red'))
             print('==========================================================\n' \
-                + status.stdout + '==========================================================')
+                + result.stdout + '==========================================================')
             print(colored('- Problem occurred while getting Storage/Autochanger resources from the Director!', 'red'))
             print(colored('  - Exiting!\n', 'red'))
             sys.exit(1)
         else:
-            # return re.sub('.*storage\n(.*)(You have messages.\n)?quit.*', '\\1', status.stdout, flags=re.DOTALL)
+            # return re.sub('.*storage\n(.*)(You have messages.\n)?quit.*', '\\1', result.stdout, flags=re.DOTALL)
             # I could not get this regex to work for 0 or 1 of 'You have messages.\n'... grrrrr
-            # So I reverted to a .replace() on the status.stdout from subprocess.run first, then the re.sub
-            yhmstripped = status.stdout.replace('You have messages.\n', '')
+            # So I reverted to a .replace() on the result.stdout from subprocess.run first, then the re.sub
+            # ----------------------------------------------------------------------------------------------------
+            yhmstripped = result.stdout.replace('You have messages.\n', '')
             storages_split = re.sub('.*storage\n(.*)quit.*', '\\1', yhmstripped, flags=re.DOTALL).split()
             print('    - Found the following Storage/Autochanger resource' + ('s' if len(storages_split) > 1 else '') + ' configured in the Director: ' + colored(", ".join(storages_split), 'yellow'))
             return storages_split
@@ -260,14 +273,14 @@ def get_storages():
 def get_storage_address(st):
     'Given a Director Storage/Autochanger name, return the IP address'
     cmd = f"echo -e 'show storage={st}\nquit\n' | {bc_bin} -c {bc_cfg}"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # A try test does not catch errors, but
-    # a status.returncode test works here
+    # a result.returncode test works here
     # -------------------------------------
-    if status.returncode != 0:
-        dir_conn_error(status.stdout)
+    if result.returncode != 0:
+        dir_conn_error(result.stdout)
     else:
-        return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', status.stdout, flags=re.DOTALL)
+        return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', result.stdout, flags=re.DOTALL)
 
 def is_ip_address(address):
     'Given a string, determine if it is a valid IP address'
@@ -336,8 +349,8 @@ def get_bsys_report():
     # If everything OK, unpack the script and chmod +x it.
     # ----------------------------------------------------
     cmd = f"tar xzf {local_tmp_root_dir}/{dl_file} -C {local_tmp_root_dir}"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if status.returncode == 0:
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if result.returncode == 0:
         print('      - Successfully untarred ' + local_tmp_root_dir + '/' + dl_file + ' to ' + local_tmp_root_dir)
     else:
         print(colored('      - Error untarring file!', 'red'))
@@ -353,8 +366,8 @@ def get_bsys_report():
     # -------------------
     local_script_name = 'bsys_report.pl'
     cmd = f"mv {local_tmp_root_dir}/bsys_report.pl {local_script_dir}/{local_script_name}"
-    status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if status.returncode == 0:
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if result.returncode == 0:
         print('      - Successfully moved ' + local_tmp_root_dir + '/bsys_report.pl' + ' to ' + local_script_dir)
     else:
         print(colored('      - Error moving bsys_report.pl file!', 'red'))
@@ -384,8 +397,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.13'
-reldate = 'June 04, 2022'
+version = '1.14'
+reldate = 'June 05, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -402,6 +415,13 @@ now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
+
+
+# Get a list of local IP address. If any of these end up in the host list
+# we will use cp instead of scp to send/retrieve files, and subprocess to
+# run the 'remote' script instead of paramiko's ssh.exec_command()
+# -----------------------------------------------------------------------
+local_ip_lst = get_local_ips()
 
 # If the passphrase was entered on the command
 # line, set the ssh_priv_key_pass variable
@@ -501,7 +521,7 @@ for st in storage_lst:
 # Now get the reports from each host in the host_dict dictionary
 # --------------------------------------------------------------
 if len(host_dict) == 0:
-    print(colored('\n  - There are no valid Storages/Autochangers to gather reports from!', 'red'))
+    print(colored('\n  - There are no valid hosts to gather reports from!', 'red'))
 else:
     print(colored('\n  - Attempting to retrieve report' + ('' if len(host_dict) == 1 else 's') \
         + ' from server' + ('' if len(host_dict) == 1 else 's') \
@@ -531,62 +551,79 @@ else:
 
         # Upload the local bsys report generator script to the remote host with
         # a timestamped filename to prevent overwrites or any permission issues
+        # If the host is local, use cp instead of scp
         # ---------------------------------------------------------------------
-        print('      - Uploading ' + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name + ' to ' + host + ':' + remote_tmp_dir)
+        print('      - ' + ('Copying ' if host in local_ip_lst else 'Uploading ') \
+              + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name \
+              + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else remote_tmp_dir))
         try:
-            cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
-            status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            if host in local_ip_lst:
+                cmd = f"cp -a {local_script_dir}/{local_script_name} {remote_script_name}"
+                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            else:
+                cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
+                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
-            print(colored('          - Problem uploading ' + local_script_dir + '/' \
-                  + local_script_name + ' to ' + remote_tmp_dir, 'red'))
+            print(colored('          - Problem ' + ('uploading ' if host not in local_ip_lst else 'copying ') + local_script_dir + '/' \
+                  + local_script_name + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else remote_tmp_dir), 'red'))
             print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
 
-        # Run the uploaded bsys report generator script and
-        # capture the output to get the name of the report file
-        # -----------------------------------------------------
         # Set up and open the ssh connection to the host
         # ----------------------------------------------
-        try:
-            print('      - Setting up ssh connection')
-            ssh = SSHClient()
-            ssh.load_system_host_keys()
-            ssh.set_missing_host_key_policy(AutoAddPolicy())
-            ssh.connect(host, username=ssh_user, timeout=5, password=ssh_priv_key_pass)
-        except Exception as e:
-            errors += 1
-            print(colored('        - ' + str(e), 'red'))
-            print(colored('          - Problem setting up ssh connection', 'red'))
-            continue
-        print(colored('        - Done', 'green'))
-        print('      - Running ' + host + ':' + remote_script_name \
+        if host not in local_ip_lst:
+            try:
+                print('      - Setting up ssh connection')
+                ssh = SSHClient()
+                ssh.load_system_host_keys()
+                ssh.set_missing_host_key_policy(AutoAddPolicy())
+                ssh.connect(host, username=ssh_user, timeout=5, password=ssh_priv_key_pass)
+            except Exception as e:
+                errors += 1
+                print(colored('        - ' + str(e), 'red'))
+                print(colored('          - Problem setting up ssh connection', 'red'))
+                continue
+            print(colored('        - Done', 'green'))
+
+        print('      - Running ' + (host + ':' if host not in local_ip_lst else '') + remote_script_name \
               + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir)
-        remote_cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
+
+        # Only query storages if we are running on a Director
+        # ---------------------------------------------------
+        # The same command can be used for local and remote hosts
+        # -------------------------------------------------------
+        cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
         try:
-            # Only query storages if we are running on a Director
-            # ---------------------------------------------------
-            stdin, stdout, stderr = ssh.exec_command(remote_cmd)
-            result = stdout.readlines()
+            if host not in local_ip_lst:
+                stdin, stdout, stderr = ssh.exec_command(cmd)
+                result = stdout.readlines()
+            else:
+                result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
-            print(colored('        - Problem encountered while trying to run remote script ' \
-                  + host + ':' + remote_script_name, 'red'))
+            print(colored('        - Problem encountered while trying to run ' \
+                  + ('remote' if host not in local_ip_lst else 'local') + ' script ' \
+                  + (host + ':' if host not in local_ip_lst else '') + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
 
         # Close the ssh connection
         # ------------------------
-        ssh.close()
+        if host not in local_ip_lst:
+            ssh.close()
 
         # Strip the comma off of the name that
         # was captured when the script was run
         # ------------------------------------
-        remote_dl_file = result[0].split()[3].replace(',', '')
+        if host not in local_ip_lst:
+            remote_dl_file = result[0].split()[3].replace(',', '')
+        else:
+            remote_dl_file = result.stdout.split()[3].replace(',', '')
 
         # Create a filename for the downloaded bsys report that is
         # prepended with 'Director' or the Storage name depending on
@@ -596,18 +633,26 @@ else:
         # -----------------------------------------------------------
         local_dl_file = local_tmp_dir + '/' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
 
-        # Now download the report
-        # -----------------------
-        print('      - Retrieving report ' + host + ':' + remote_dl_file)
+        # Now scp the remote report, or cp the local report
+        # -------------------------------------------------
+        print('      - ' + ('Copying ' if host in local_ip_lst else 'Downloading ') \
+              + (ssh_user + '@' + host + ':' if host not in local_ip_lst else '') \
+              + remote_dl_file + ' to:\n                ' + local_dl_file)
         try:
-            cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
-            status = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            if host in local_ip_lst:
+                cmd = f"cp -a {remote_dl_file} {local_dl_file}"
+                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            else:
+                cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
+                subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             reports += 1
         except Exception as e:
             errors += 1
             print(colored('        - ' + str(e), 'red'))
-            print(colored('        - Problem encountered while trying to download remote bsys report ' \
-                  + host + ':' + remote_dl_file + '\n          as: ' + local_dl_file, 'red'))
+            print(colored('        - Problem encountered while trying to ' \
+                  + ('download remote' if host not in local_ip_lst else 'copy') + ' bsys report ' \
+                  + (host + ':' + remote_dl_file if host not in local_ip_lst else remote_dl_file) \
+                  + '\n          as:\n               ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
         print(colored('        - Done', 'green'))
@@ -631,27 +676,25 @@ elif reports == 1:
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     print(colored('\n  - The one bsys report file is here: ', 'white', attrs=['bold']) + colored(new_local_dl_file, 'yellow'))
 else:
-    tar_err = False
     tar_filename = mask + '_' + now + '.tar'
     print(colored('\n  - Creating tarball of all bsys reports.', 'white', attrs=['bold']))
-    try:
-        cmd = f"cd {local_tmp_dir}; tar -cf {tar_filename} *.gz"
-        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    except:
-        errors += 1
-        tar_err = True
-        print(colored('    - Problem encountered while trying to tar bsys reports.', 'red'))
-        print(colored('    - Please check the local directory: ', 'red') + local_tmp_dir)
-    if tar_err == False:
+    cmd = f"cd {local_tmp_dir}; tar -cf {tar_filename} *.gz"
+    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if result.returncode == 0:
         print(colored('    - Done\n', 'green'))
         if reports >= 1:
-            print(colored('  - ' + ('All ' if reports > 1 else 'The ') + 'bsys report' \
+            print(colored('  - ' + ('All ' if reports > 1 else 'The ') + str(reports) + ' bsys report' \
                   + ('s' if reports > 1 else '') + (' is' if reports == 1 else ' are') \
                   + ' available in directory: ', 'white', attrs=['bold']) + colored(local_tmp_dir, 'yellow'))
-        print(colored('\n  - Archive (tar) of all reports available as: ', 'white', attrs=['bold']) \
+        print(colored('\n  - Archive (tar) of all ' + str(reports) + ' reports available as: ', 'white', attrs=['bold']) \
               + colored(local_tmp_dir + '/' + tar_filename, 'yellow'))
+    else:
+        errors += 1
+        print(colored('    - Problem encountered while trying to tar bsys reports.', 'red'))
+        print(colored('    - Please check the local directory: ', 'red') + local_tmp_dir)
+
 if errors > 0:
-    print(colored('  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
+    print(colored('\n  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
           + ' detected during script run. Please check the script output above!', 'red', attrs=['bold']))
 if '127.0.0.1' in host_dict.values():
     print(colored('\n  - WARNING:', 'white', attrs=['bold']))
