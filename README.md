@@ -7,7 +7,7 @@
 
 ```
 Usage:
-get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>] [-p <pass>]
+get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>]
 get_bsys_reports.py -h | --help
 get_bsys_reports.py -v | --version
 
@@ -18,7 +18,6 @@ Options:
 -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
 -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
 -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
--p, --pass <pass>        SSH private key passphrase, or ssh user passphrase
 
 -h, --help               Print this help message.
 -v, --version            Print the script name and version.
