@@ -172,10 +172,8 @@ INSTRUCTIONS
 # ----------------------------------------------------
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
-# bc_bin = '/opt/bacula/bin/bconsole'
-# bc_cfg = '/opt/bacula/etc/bconsole.conf'
-bc_bin = '/opt/comm-bacula/sbin/bconsole'
-bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
+bc_bin = '/opt/bacula/bin/bconsole'
+bc_cfg = '/opt/bacula/etc/bconsole.conf'
 
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
@@ -396,8 +394,8 @@ from paramiko import SSHClient, ssh_exception, AutoAddPolicy
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.16'
-reldate = 'June 06, 2022'
+version = '1.17'
+reldate = 'June 07, 2022'
 url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
 
 # Assign docopt doc string variable
