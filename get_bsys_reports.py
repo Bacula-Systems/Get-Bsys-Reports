@@ -53,8 +53,8 @@ INSTRUCTIONS
 
 - Please read ALL of these instructions before attempting to run this
   script.  There are a lot of moving parts, and there are a lot of things
-  (external to this script) that need to be working before using this
-  script.
+  (external to this script) that need to be working before this script
+  will work properly.
 
 - The idea and workflow of this script is as follows:
 
@@ -258,8 +258,7 @@ def get_storages():
         if re.match('(^.*(ERROR|invalid| Bad ).*|^Connecting to Director [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]{4,5}$)', result.stdout, flags=re.DOTALL):
             print(colored('    - Problem in get_storages()...', 'red', attrs=['bold']))
             print(colored('- Reply from bconsole:', 'red'))
-            print('==========================================================\n' \
-                + result.stdout + '==========================================================')
+            print(57 * '=' + '\n' + result.stdout + 57 * '=')
             print(colored('- Problem occurred while getting Storage/Autochanger resources from the Director!', 'red'))
             print(colored('  - Exiting!\n', 'red'))
             sys.exit(1)
@@ -313,7 +312,7 @@ def get_ip_address(address, type=None):
     if is_ip_address(address):
         print('      - ' + address + ' is an IP address')
         if type == 'dir':
-            print('        - Adding Director\'s IP address ' + address + ' to list of hosts to retrieve report from.')
+            print('        - Adding Director\'s IP address ' + '(' + address + ')' + ' to list of hosts to retrieve report from.')
             host_dict['Director'] = address
         return address
     else:
@@ -332,7 +331,7 @@ def get_ip_address(address, type=None):
         else:
             print('        - FQDN/host ' + address + ' = ' + ip)
             if type == 'dir':
-                print('        - Adding Director\'s IP address ' + ip + ' to list of hosts to retrieve report from.')
+                print('        - Adding Director\'s IP address ' + '(' + ip + ')' + ' to list of hosts to retrieve report from.')
                 host_dict['Director'] = ip
         return ip
 
@@ -340,7 +339,6 @@ def get_bsys_report():
     'Download the current bsys report generator script from Bacula Systems, unpack, set executable and move to local_script_dir'
     print(colored('  - Option \'-g\' (--get-bsys-report) provided on command line. Downloading bsys_report.tar.gz', 'white', attrs=['bold']))
     dl_file = now + '_bsys_report.tar.gz'
-    url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
     try:
         response = requests.get(url)
         open(local_tmp_root_dir +'/' + dl_file, 'wb').write(response.content)
@@ -383,8 +381,8 @@ def get_bsys_report():
 # End of functions
 # ----------------
 
-# Import modules and methods
-# --------------------------
+# Import modules and functions
+# ----------------------------
 import os
 import re
 import sys
@@ -395,14 +393,15 @@ import subprocess
 from docopt import docopt
 from datetime import datetime
 from termcolor import colored
-from paramiko import SSHClient, ssh_exception, AutoAddPolicy
 from ipaddress import ip_address, IPv4Address
+from paramiko import SSHClient, ssh_exception, AutoAddPolicy
 
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
 version = '1.16'
 reldate = 'June 06, 2022'
+url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -445,6 +444,7 @@ else:
         if len(mask) == 0:
             print('    - Input must not be empty. Try again.')
         else:
+            print('')
             break
 
 # Check if we have a bconsole config specified on the command line
@@ -464,10 +464,10 @@ if args['--all']:
     print(colored('  - Option \'--all\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     all_storage_lst = get_storages()
 elif args['--dir']:
-    print(colored('  - Option \'--dir\' provided on command line. Will attempt to get report from the Director.\n', 'white', attrs=['bold']))
+    print(colored('  - Option \'--dir\' provided on command line. Will attempt to get report from the Director.', 'white', attrs=['bold']))
 
 if len(args['<st>']) > 0:
-    print(colored('  - The following Storage/Autochanger resource' \
+    print(colored('\n  - The following Storage/Autochanger resource' \
           + ('s were' if len(args['<st>']) > 1 else ' was') \
           + ' provided on the command line: ', 'white', attrs=['bold']) \
           + colored(", ".join(args['<st>']), 'yellow'))
@@ -517,11 +517,11 @@ for st in storage_lst:
     # but only if the IP address does not exist in values
     # ---------------------------------------------------
     if ip not in host_dict.values():
-        print('        - Adding Storage "' + st + '" (' + ip + ') to list of hosts to retrieve report from.')
+        print('        - Adding Storage \'' + st + '\' (' + ip + ') to list of hosts to retrieve report from.')
         host_dict[st] = ip
     else:
         print('        - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
-              + '"' + st + '" (' + ip + ') already in list. Skipping...')
+              + '\'' + st + '\' (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each host in the host_dict dictionary
 # --------------------------------------------------------------
