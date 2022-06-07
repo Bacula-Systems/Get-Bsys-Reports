@@ -18,14 +18,14 @@
 #  Director and all (or specific) Storage/Autochanger resources in Director's
 #  configuration.
 #
-#  Initial version written by Bill Arlofski, April-May 2022
+#  Initial version written by Bill Arlofski, April-June 2022
 # -----------------------------------------------------------------------------
 
 # Define the docopt string
 # ------------------------
 doc_opt_str = """
 Usage:
-    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>] [-p <pass>]
+    get_bsys_reports.py (--all | --dir | <st>... | --dir <st>...) [-c <bconfig>] [-g] [-m <mask>]
     get_bsys_reports.py -h | --help
     get_bsys_reports.py -v | --version
 
@@ -36,7 +36,6 @@ Options:
     -c, --bconfig <bconfig>  Specify the bconsole.conf file to use. (/opt/bacula/etc/bconsole.conf).
     -g, --get-bsys-report    Download current bsys report generator script from Bacula Systems' website.
     -m, --mask <mask>        Ticket mask ID or company name. The tar file of bsys reports will have this text prepended to it.
-    -p, --pass <pass>        SSH private key passphrase, or ssh user passphrase
 
     -h, --help               Print this help message.
     -v, --version            Print the script name and version.
@@ -88,12 +87,13 @@ INSTRUCTIONS
     addresses so that only one report is gathered from each system.
 
     Once we have the list of unique IP addresses, the script will iterate
-    through the list, upload the bsys_report.pl script file to the host,
+    through the list, scp (or copy in the case of local IP addresses) the
+    bsys_report.pl script file to the host,
     run the script, grab the unique name of the report gzip file that will
-    be created, and when the script is finished running, download the
+    be created, and when the script is finished running, scp (or mv) the
     resulting report file from the host into a local temporary directory.
 
-    When all reports are downloaded, if there is more than one, they will
+    When all reports are downloaded, if there are more than one, they will
     be tarred into one file that can be sent to the Bacula Systems Support
     Team.
 
@@ -107,56 +107,54 @@ INSTRUCTIONS
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
 
-  - Edit the `local_script_dir` and `local_script_name` variables in this
+  - Edit the 'local_script_dir' and 'local_script_name' variables in this
     script accordingly.
 
   - If the system that this script will run on has Internet access, you can
     use the '-g' (--get-bsys-report) command line option and the script
     will automatically download the current bsys report generator script
-    from the Bacula Systems website, untar it, set it executable, and move
-    it to the 'local_script_dir' directory.
+    from the Bacula Systems website, untar it, move it to the
+    'local_script_dir' directoryi, and set it executable.
 
   - If the system that will run this script does not have Internet access,
     you will need to download a current bsys report generator script from
     here: https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
-    untar/gunzip the perl `bsys_report.pl` script file inside, set it
+    untar/gunzip the perl 'bsys_report.pl' script file inside, set it
     executable, and copy it to the 'local_script_dir' directory.
 
-  - If you do not want to put the ssh private key passphrase on the command
-    line or in this script, then the following recommended steps must be
-    taken first:
+  - The the following steps must be taken first:
 
-        - You must have already created a private/public ssh key pair on
-          the host that will be running this script.
+        - You must have already created a private/public ssh key pair for
+          the user on the host that will be running this script.
 
         - The public key must already be on each Director and SD server
           that the script might need to retrieve a bsys report from.
 
         - The public key should be added to the ~/.ssh/authorized_keys file
           the user on the remote servers that the script will be connecting
-          as (default `root`). The best way to do this is with the
-          `ssh-copy-id` utility.
+          as (default 'root'). The best way to do this is with the
+          'ssh-copy-id' utility.
 
         - If the private key has a passphrase, then you must be running
-          `ssh-agent` on the host that will run this script, and your
+          'ssh-agent' on the host that will run this script, and your
           private key MUST have already been added to it. The keychain
-          utility is a nice way to add your ssh private keys to ssh-agent
-          on login.
+          utility is a nice way to automatically add your ssh private keys
+          to ssh-agent on login.
 
   - The script does not need to be run on the Director! If it is run on a
     different host than the Director, then you must have bconsole installed
     on the host that will run the script, and a properly configured
     bconsole.conf configuration file(s) that allows bconsole to communicate
-    with the Director(s).
+    with the remote Director(s).
 
   - In a multi-Director environment, you may create a bconsole.conf file
     for each Director, and then use the '-c' <bconfig> command line option
-    to tell the script which configuration file to use, and hence which
-    Director and Storages to retreive bsys reports from.
+    to tell the script which configuration file to use, and therefore which
+    Director and Storages to retrieve bsys reports from.
 
-  - This script only uses the bconsole `.storage` and `show storage=xxxx`
-    commands, so you may consider using a non-privileged Console configured in
-    the Director to limit access to just these commands.
+  - This script only uses the bconsole 'status director', '.storage', and
+    'show storage=xxxx' commands, so you may consider using a non-privileged
+    Console configured in the Director to limit access to just these commands.
 
   - REQUIRED MODULES:
 
@@ -174,16 +172,15 @@ INSTRUCTIONS
 # ----------------------------------------------------
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
-bc_bin = '/opt/bacula/bin/bconsole'
-bc_cfg = '/opt/bacula/etc/bconsole.conf'
+# bc_bin = '/opt/bacula/bin/bconsole'
+# bc_cfg = '/opt/bacula/etc/bconsole.conf'
+bc_bin = '/opt/comm-bacula/sbin/bconsole'
+bc_cfg = '/opt/comm-bacula/etc/bconsole.conf'
 
 # Define the ssh user to use when connecting to remote systems
 # ------------------------------------------------------------
 ssh_user = 'root'       # Best option as the bsys_report.pl script
                         # collects a lot of system information too
-ssh_priv_key_pass = ''  # It is NOT recommended to set this!
-                        # See above about setting up ssh-agent
-                        # or passphraseless ssh private key!
 
 # Define the location of the local bsys_report.pl
 # -----------------------------------------------
@@ -427,12 +424,6 @@ storage_lst = []
 # -----------------------------------------------------------------------
 local_ip_lst = get_local_ips()
 
-# If the passphrase was entered on the command
-# line, set the ssh_priv_key_pass variable
-# --------------------------------------------
-if args['--pass'] != None:
-    ssh_priv_key_pass = args['--pass']
-
 # Get the ticket mask or company name to prepend to the .tar file name
 # --------------------------------------------------------------------
 if args['--mask'] != None:
@@ -587,7 +578,7 @@ else:
                 ssh = SSHClient()
                 ssh.load_system_host_keys()
                 ssh.set_missing_host_key_policy(AutoAddPolicy())
-                ssh.connect(host, username=ssh_user, timeout=5, password=ssh_priv_key_pass)
+                ssh.connect(host, username=ssh_user, timeout=5)
             except Exception as e:
                 errors += 1
                 print(colored('        - ' + str(e), 'red'))
