@@ -172,21 +172,22 @@ INSTRUCTIONS
 # ----------------------------------------------------
 # SET SOME VARIABLES SPECIFIC TO THE LOCAL ENVIRONMENT
 # ----------------------------------------------------
-# Define the ssh user to use when connecting to remote systems
-# ------------------------------------------------------------
-ssh_user = 'root'
-ssh_priv_key_pass = ''  # It is NOT recommended to set this!
-                        # See above about setting up ssh-agent
-                        # or passphraseless ssh private key!
-
 # Define the bconsole program and config file locations
 # -----------------------------------------------------
 bc_bin = '/opt/bacula/bin/bconsole'
 bc_cfg = '/opt/bacula/etc/bconsole.conf'
 
+# Define the ssh user to use when connecting to remote systems
+# ------------------------------------------------------------
+ssh_user = 'root'       # Best option as the bsys_report.pl script
+                        # collects a lot of system information too
+ssh_priv_key_pass = ''  # It is NOT recommended to set this!
+                        # See above about setting up ssh-agent
+                        # or passphraseless ssh private key!
+
 # Define the location of the local bsys_report.pl
 # -----------------------------------------------
-local_script_dir = './'
+local_script_dir = './'  # Default location is same directory as this script
 local_script_name = 'bsys_report.pl'
 
 # Where to upload the script on the remote servers
@@ -201,6 +202,7 @@ local_tmp_root_dir = '/tmp'  # This may be set to a more permanent location to k
 # Define some functions
 # ---------------------
 def chmod_file(file):
+    'Given the name of a /path/to/file set its permissions to 755'
     try:
         os.chmod(file, 0o755)
     except Exception as e:
@@ -210,7 +212,7 @@ def chmod_file(file):
         sys.exit(1)
 
 def get_local_ips():
-    'Get local IPv4 addresses and return as a list. Exit script if none ar found'
+    'Get local IPv4 addresses and return as a list. Exit script if none are found'
     cmd = f"ip a"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     lst = re.findall('.* inet (.+?)/.*', result.stdout)
@@ -222,6 +224,7 @@ def get_local_ips():
         return lst
 
 def dir_conn_error(result):
+    'Given a test string, print it and exit'
     print(result)
     print(colored('    - Error connecting to the Director', 'red'))
     print(colored('      - Exiting!\n', 'red'))
@@ -232,7 +235,7 @@ def get_dir_info():
     cmd = f"echo -e 'quit\n' | {bc_bin} -c {bc_cfg}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # A try test does not catch errors from bconsole,
-    # but a result.returncode test works here
+    # but a test of result.returncode test works here
     # -----------------------------------------------
     if result.returncode != 0:
         dir_conn_error(result.stdout)
@@ -247,8 +250,8 @@ def get_storages():
     cmd = f"echo -e '.storage\nquit\n' | {bc_bin} -c {bc_cfg}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # A try test does not catch errors, but
-    # a result.returncode test works here
-    # -------------------------------------
+    # a test of result.returncode test works
+    # --------------------------------------
     if result.returncode != 0:
         dir_conn_error(result.stdout)
     else:
@@ -277,8 +280,8 @@ def get_storage_address(st):
     cmd = f"echo -e 'show storage={st}\nquit\n' | {bc_bin} -c {bc_cfg}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # A try test does not catch errors, but
-    # a result.returncode test works here
-    # -------------------------------------
+    # a test of result.returncode test works
+    # --------------------------------------
     if result.returncode != 0:
         dir_conn_error(result.stdout)
     else:
@@ -334,14 +337,14 @@ def get_ip_address(address, type=None):
         return ip
 
 def get_bsys_report():
-    'Download the current bsys report generator script from Bacula Systems'
+    'Download the current bsys report generator script from Bacula Systems, unpack, set executable and move to local_script_dir'
+    print(colored('  - Option \'-g\' (--get-bsys-report) provided on command line. Downloading bsys_report.tar.gz', 'white', attrs=['bold']))
     dl_file = now + '_bsys_report.tar.gz'
     url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
-    print(colored('  - Option \'-g\' (--get-bsys-report) provided on command line. Downloading bsys_report.tar.gz', 'white', attrs=['bold']))
     try:
         response = requests.get(url)
-        print('    - Successfully downloaded ' + url + ' to ' + local_tmp_root_dir +'/' + dl_file)
         open(local_tmp_root_dir +'/' + dl_file, 'wb').write(response.content)
+        print('    - Successfully downloaded ' + url + ' to ' + local_tmp_root_dir +'/' + dl_file)
     except Exception as e:
         print(colored('    - Error downloading bsys report generator script! (' + url + ')', 'red'))
         print(colored('      ' + str(e), 'red'))
@@ -366,7 +369,6 @@ def get_bsys_report():
 
     # Now move the script
     # -------------------
-    local_script_name = 'bsys_report.pl'
     cmd = f"mv {local_tmp_root_dir}/bsys_report.pl {local_script_dir}/{local_script_name}"
     result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if result.returncode == 0:
@@ -399,8 +401,8 @@ from ipaddress import ip_address, IPv4Address
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.15'
-reldate = 'June 05, 2022'
+version = '1.16'
+reldate = 'June 06, 2022'
 
 # Assign docopt doc string variable
 # ---------------------------------
@@ -417,6 +419,8 @@ now = datetime.now().strftime('%Y%m%d%H%M%S')
 remote_script_name = remote_tmp_dir + '/' + now + '_' + local_script_name
 local_tmp_dir = tempfile.mkdtemp(dir=local_tmp_root_dir, prefix='all_bsys_reports-')
 errors = 0
+host_dict = {}
+storage_lst = []
 
 # Get a list of local IP address. If any of these end up in the host list
 # we will use cp instead of scp to send/retrieve files, and subprocess to
@@ -436,7 +440,8 @@ if args['--mask'] != None:
     mask = re.sub('\s+', '_', args['--mask'])
 else:
     while True:
-        mask = re.sub('\s+', '_', input(colored('  - Enter the ticket mask (preferred) or your company name: ', 'white', attrs=['bold'])))
+        mask = re.sub('\s+', '_', input(colored('  - Enter the ticket mask (preferred) or your company name.', 'white', attrs=['bold']) \
+               + colored('\n    - Hint: You may use the -m <mask> command line option to skip this prompt: ', 'white')))
         if len(mask) == 0:
             print('    - Input must not be empty. Try again.')
         else:
@@ -455,7 +460,6 @@ if args['--get-bsys-report']:
 
 # Get all the Storages/Autochangers defined in the Director config
 # ----------------------------------------------------------------
-storage_lst = []
 if args['--all']:
     print(colored('  - Option \'--all\' provided on command line. Will attempt to get reports from Director and all Storages.', 'white', attrs=['bold']))
     all_storage_lst = get_storages()
@@ -485,10 +489,10 @@ if args['--all'] or len(args['<st>']) > 0:
 
 # Create a dictionary of Storage resources defined in the Director
 # ----------------------------------------------------------------
-host_dict = {}
-print(colored('\n  - Determining IP address for ' + ('Director and ' if args['--all'] else '') \
-      + ('All ' if len(storage_lst) > 1 else '') + 'Storage resource' + ('s' if len(storage_lst) > 1 else '') \
-      + ' and creating unique host list.', 'white', attrs=['bold']))
+print(colored('\n  - Determining IP addresses for ' + ('Director' if args['--all'] or args['--dir'] else '') \
+      + (' and ' if (args['--all'] or (args['--dir'] and len(storage_lst) > 0)) else '') \
+      + ('all ' if len(storage_lst) > 1 else '') + ('Storage resource' if len(storage_lst) > 0 else '') \
+      + ('s' if len(storage_lst) > 1 else '') + ' and creating unique host list.', 'white', attrs=['bold']))
 
 if args['--all'] or args['--dir']:
     dir_name, dir_address = get_dir_info()
@@ -517,7 +521,7 @@ for st in storage_lst:
         host_dict[st] = ip
     else:
         print('        - IP address for ' + ('Storage ' if not st == 'DIR' else 'local ') \
-               + '"' + st + '" (' + ip + ') already in list. Skipping...')
+              + '"' + st + '" (' + ip + ') already in list. Skipping...')
 
 # Now get the reports from each host in the host_dict dictionary
 # --------------------------------------------------------------
@@ -525,9 +529,9 @@ if len(host_dict) == 0:
     print(colored('\n  - There are no valid hosts to gather reports from!', 'red'))
 else:
     print(colored('\n  - Attempting to retrieve report' + ('' if len(host_dict) == 1 else 's') \
-        + ' from server' + ('' if len(host_dict) == 1 else 's') \
-        + ' with IP address' + ('' if len(host_dict) == 1 else 'es') \
-        + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
+          + ' from server' + ('' if len(host_dict) == 1 else 's') \
+          + ' with IP address' + ('' if len(host_dict) == 1 else 'es') \
+          + ': ', 'white', attrs=['bold'])+ colored(", ".join(host_dict.values()), 'yellow'))
 
     # Use a dictionary comprehension to invert the keys and values
     # of the host_dict dictionary so we can get the name of the
@@ -548,6 +552,7 @@ else:
     # ---------------------------------------------------------------
     reports = 0
     for host in host_dict.values():
+        remote_err = 1
         print(colored('    - Working on host: ', 'green') + colored(host + ' (' + rev_host_dict[host] + ')', 'yellow'))
 
         # Upload the local bsys report generator script to the remote host with
@@ -555,29 +560,30 @@ else:
         # If the host is local, use cp instead of scp
         # ---------------------------------------------------------------------
         print('      - ' + ('Copying ' if host in local_ip_lst else 'Uploading ') \
-              + local_script_dir + ('/' if local_script_dir != './' else '') + local_script_name \
-              + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else '') + remote_script_name)
+              + local_script_dir + ('' if local_script_dir.endswith('/')  else '/') + local_script_name \
+              + ' to ' + ('local ' if host in local_ip_lst else 'remote ' + ssh_user + '@' + host + ':') + remote_script_name)
         if host in local_ip_lst:
             cmd = f"cp -a {local_script_dir}/{local_script_name} {remote_script_name}"
-            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         else:
             cmd = f"scp {local_script_dir}/{local_script_name} {ssh_user}@{host}:{remote_script_name}"
-            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode == 0:
             print(colored('        - Done', 'green'))
         else:
             errors += 1
+            print(colored('        - cmd: ' + cmd, 'red'))
             print(colored('        - ' + result.stderr, 'red'))
-            print(colored('          - Problem ' + ('uploading ' if host not in local_ip_lst else 'copying ') + local_script_dir + '/' \
-                  + local_script_name + ' to ' + (ssh_user + '@' + host + ':' if host not in local_ip_lst else remote_tmp_dir), 'red'))
+            print(colored('          - Problem ' + ('copying ' if host in local_ip_lst else 'uploading ') \
+                  + local_script_dir + ('' if local_script_dir.endswith('/')  else '/') + local_script_name \
+                  + ' to ' + ('local ' if host in local_ip_lst else 'remote ' + ssh_user + '@' + host + ':') + remote_script_name, 'red'))
             print(colored('            - Skipping this host "' + host + '"!\n', 'red'))
             continue
 
-        # Set up and open the ssh connection to the host
-        # ----------------------------------------------
+        # Set up and open the ssh connection if the host is remote
+        # --------------------------------------------------------
         if host not in local_ip_lst:
             try:
-                print('      - Setting up ssh connection')
+                print('      - Setting up ssh connection to ' + host + ' with user ' + ssh_user)
                 ssh = SSHClient()
                 ssh.load_system_host_keys()
                 ssh.set_missing_host_key_policy(AutoAddPolicy())
@@ -589,44 +595,49 @@ else:
                 continue
             print(colored('        - Done', 'green'))
 
-        print('      - Running ' + (host + ':' if host not in local_ip_lst else '') + remote_script_name \
-              + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir)
-
         # Only query storages if we are running on a Director
         # ---------------------------------------------------
-        # The same command can be used for local and remote hosts
-        # -------------------------------------------------------
+        # The same cmd can be used for local and remote hosts
+        # ---------------------------------------------------
         cmd = remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir
-        if host not in local_ip_lst:
-            stdin, stdout, stderr = ssh.exec_command(cmd)
-            result = stdout.readlines()
-            err = stderr.readlines()
-        else:
+        print('      - Running ' + ('local command: ' if host in local_ip_lst else 'remote command: ' + host + ':') \
+              + remote_script_name + (' -s' if rev_host_dict[host] != 'Director' else '') + ' -o ' + remote_tmp_dir)
+        if host in local_ip_lst:
             result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             err = result.stderr
-        if result.returncode == 0:
+            if result.returncode == 0:
+                remote_err = 0
+        else:
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            result = stdout.readlines()
+            err = str(stderr.readlines())
+            if stdout.channel.recv_exit_status() == 0:
+                remote_err = 0
+        if remote_err == 0:
             print(colored('        - Done', 'green'))
         else:
             errors += 1
             print(colored('        - ' + err, 'red'))
             print(colored('        - Problem encountered while trying to run ' \
-                  + ('remote' if host not in local_ip_lst else 'local') + ' script ' \
-                  + (host + ':' if host not in local_ip_lst else '') + remote_script_name, 'red'))
+                  + ('local' if host in local_ip_lst else 'remote') + ' script ' \
+                  + ('' if host in local_ip_lst else host + ':') + remote_script_name, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
 
-        # Close the ssh connection
-        # ------------------------
+        # Close the ssh connection if the host is remote
+        # ----------------------------------------------
         if host not in local_ip_lst:
             ssh.close()
 
         # Strip the comma off of the name that
         # was captured when the script was run
+        # The process is different depending
+        # on if the host is local or remote
         # ------------------------------------
-        if host not in local_ip_lst:
-            remote_dl_file = result[0].split()[3].replace(',', '')
-        else:
+        if host in local_ip_lst:
             remote_dl_file = result.stdout.split()[3].replace(',', '')
+        else:
+            remote_dl_file = result[0].split()[3].replace(',', '')
 
         # Create a filename for the downloaded bsys report that is
         # prepended with 'Director' or the Storage name depending on
@@ -636,17 +647,16 @@ else:
         # -----------------------------------------------------------
         local_dl_file = local_tmp_dir + '/' + rev_host_dict[host] + '-' + host + '-' + os.path.basename(remote_dl_file)
 
-        # Now scp the remote report, or cp the local report
-        # -------------------------------------------------
-        print('      - ' + ('Copying ' if host in local_ip_lst else 'Downloading ') \
-              + (ssh_user + '@' + host + ':' if host not in local_ip_lst else '') \
-              + remote_dl_file + ' to:\n                ' + local_dl_file)
+        # Now scp the remote report, or cp the local report to the local_dl_file
+        # ----------------------------------------------------------------------
+        print('      - ' + ('Copying local ' if host in local_ip_lst else 'Downloading remote ') \
+              + ('' if host in local_ip_lst else host + ':') + remote_dl_file + '\n' \
+              + (16 * ' ' if host in local_ip_lst else 20 * ' ') + 'to: ' + local_dl_file)
         if host in local_ip_lst:
             cmd = f"cp -a {remote_dl_file} {local_dl_file}"
-            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         else:
             cmd = f"scp {ssh_user}@{host}:{remote_dl_file} {local_dl_file}"
-            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode == 0:
             reports += 1
             print(colored('        - Done', 'green'))
@@ -654,9 +664,9 @@ else:
             errors += 1
             print(colored('        - ' + result.stderr, 'red'))
             print(colored('        - Problem encountered while trying to ' \
-                  + ('download remote' if host not in local_ip_lst else 'copy') + ' bsys report ' \
-                  + (ssh_user + '@' + host + ':' + remote_dl_file if host not in local_ip_lst else '') + remote_dl_file \
-                  + '\n          as:\n               ' + local_dl_file, 'red'))
+                  + ('copy local' if host in local_ip_lst else 'download remote') + ' bsys report ' \
+                  + ('' if host in local_ip_lst else host + ':') + remote_dl_file \
+                  + '\n          to:\n               ' + local_dl_file, 'red'))
             print(colored('          - Skipping this host "' + host + '"!\n', 'red'))
             continue
 
@@ -695,13 +705,12 @@ else:
         errors += 1
         print(colored('    - Problem encountered while trying to tar bsys reports.', 'red'))
         print(colored('    - Please check the local directory: ', 'red') + local_tmp_dir)
-
 if errors > 0:
     print(colored('\n  - (' + str(errors) + ') Error' + ('s were' if errors > 1 else ' was') \
           + ' detected during script run. Please check the script output above!', 'red', attrs=['bold']))
 if '127.0.0.1' in host_dict.values():
     print(colored('\n  - WARNING:', 'white', attrs=['bold']))
-    print(colored('    - The IP address \'127.0.0.1\' was detected in your Director\'s configuration.', 'red'))
-    print(colored('    - The report from this host might not be from the server you expect!', 'red'))
-    print(colored('    - Please do not use \'localhost\' or \'127.0.0.1\' for any of your \'Address=\' settings!', 'red'))
+    print(colored('    - The IP address \'127.0.0.1\' was detected in your Director\'s configuration.', 'yellow', attrs=['bold']))
+    print(colored('      The report from this host might not be from the server you expect!', 'yellow', attrs=['bold']))
+    print(colored('      Please do not use \'localhost\' or \'127.0.0.1\' for any of your \'Address =\' settings.', 'yellow', attrs=['bold']))
 print(colored('- Script complete.\n', 'green', attrs=['bold']))
