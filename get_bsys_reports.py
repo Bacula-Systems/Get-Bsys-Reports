@@ -102,27 +102,27 @@ INSTRUCTIONS
 - Now for the REQUIRED things to be in place before this script can be
   successfully run:
 
-  - This script REQUIRES Python >= 3.6 to run.
+  - This script REQUIRES Python => 3.6 to run.
 
   - There are several Python modules that you will need to have installed on
     your system for this script to run. (see below)
-
-  - Edit the 'local_script_dir' and 'local_script_name' variables in this
-    script accordingly.
 
   - If the system that this script will run on has Internet access, you can
     use the '-g' (--get-bsys-report) command line option and the script
     will automatically download the current bsys report generator script
     from the Bacula Systems website, untar it, move it to the
-    'local_script_dir' directoryi, and set it executable.
+    'local_script_dir' directory, and set it executable.
 
   - If the system that will run this script does not have Internet access,
     you will need to download a current bsys report generator script from
-    here: https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz,
-    untar/gunzip the perl 'bsys_report.pl' script file inside, set it
-    executable, and copy it to the 'local_script_dir' directory.
+    here: https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz
+    Then, untar/gunzip the perl 'bsys_report.pl' script file inside, set it
+    executable, and copy it to the 'local_script_dir' directory. Optionally
+    you can edit the 'local_script_dir' and 'local_script_name' variables
+    below in this script to point at where you put the report generator
+    script.
 
-  - The the following steps must be taken first:
+  - The following steps must be taken first:
 
         - You must have already created a private/public ssh key pair for
           the user on the host that will be running this script.
@@ -161,9 +161,23 @@ INSTRUCTIONS
         Before running this script, you will need to install several
         modules via pip:
 
-        # sudo pip3 install docopt
-        # sudo pip3 install requests
-        # sudo pip3 install termcolor
+          # sudo pip3 install docopt
+          # sudo pip3 install requests
+          # sudo pip3 install termcolor
+          # sudo pip3 install paramiko
+
+
+        If you are working in a more secure environment where software can
+        only be installed via local repositories pulled from official
+        software repositories and where 'pip3' cannot be used, one customer
+        who has successfully gotten this script to work has informed me that
+        the following official RedHat rpm packages are the ones necessary to
+        install:
+
+          - python36-requests.noarch
+          - python36-docopt.noarch
+          - python3-termcolor.noarch
+          - python36-paramiko.noarch
 
 """
 
