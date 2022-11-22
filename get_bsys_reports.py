@@ -293,7 +293,7 @@ def get_storage_address(st):
     if result.returncode != 0:
         dir_conn_error(result.stdout)
     else:
-        return re.sub('^.*[Storage|Autochanger]:.*address=(.+?) .*', '\\1', result.stdout, flags=re.DOTALL)
+        return re.sub('^.*[Storage|Autochanger]: name=' + st + ' address=(.+?) .*', '\\1', result.stdout, flags=re.DOTALL)
 
 def is_ip_address(address):
     'Given a string, determine if it is a valid IP address'
@@ -314,9 +314,9 @@ def resolve(address):
 def get_ip_address(address, type=None):
     'Given an address string, check if it is an IP, if not resolve it, add Director IP to host_dic'
     # Depending on type provided, (dir or st), print different messages and
-    # return different things This is really ugly, and not very Pythonic, but
+    # return different things. This is really ugly, and not very Pythonic, but
     # it prevents duplicate code for similar tasks for Director and Storages
-    # -----------------------------------------------------------------------
+    # ------------------------------------------------------------------------
     global errors
     if is_ip_address(address):
         print('      - ' + address + ' is an IP address')
@@ -408,8 +408,8 @@ from paramiko import SSHClient, ssh_exception, AutoAddPolicy
 # Set some variables
 # ------------------
 progname='Get Bsys Reports'
-version = '1.17'
-reldate = 'June 07, 2022'
+version = '1.18'
+reldate = 'November 21, 2022'
 url = 'https://www.baculasystems.com/ml/bsys_report/bsys_report.tar.gz'
 
 # Assign docopt doc string variable
